@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Transit Chart — Jyotish Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <h1 class="page-title"><i class="bi bi-stars me-2"></i>Transit Chart</h1>
+  <p class="page-sub">गोचर — Current planetary positions vs natal chart</p>
+</div>
+
+{% if transit %}
+<div class="row g-4">
+  <!-- Transit info bar -->
+  <div class="col-12">
+    <div class="transit-bar d-flex flex-wrap align-items-center gap-3 px-3 py-2">
+      <span><i class="bi bi-clock me-1 text-gold"></i>{{ transit.transit_time }}</span>
+      <span class="ms-auto text-muted small">Ayanamsa: {{ transit.ayanamsa }}°</span>
+    </div>
+  </div>
+
+  <!-- Transit chart canvas -->
+  <div class="col-xl-5">
+    <div class="card-vedic mb-4">
+      <div class="card-vedic-header">
+        <i class="bi bi-grid-3x3 me-2"></i>Transit Positions Now
+      </div>
+      <div class="card-vedic-body p-2">
+        <canvas id="transitCanvas" width="440" height="440"
+                class="kundli-canvas"
+                data-chart="{{ transit | tojson | e }}"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Planet comparison table -->
+  <div class="col-xl-7">
+    <div class="card-vedic">
+      <div class="card-vedic-header">
+        <i class="bi bi-table me-2"></i>Transit vs Natal Comparison
+        {% if not natal %}
+        <span class="badge bg-warning text-dark ms-2">Generate Kundli for natal comparison</span>
+        {% endif %}
+      </div>
+      <div class="card-vedic-body p-0">
+        <div class="table-responsive">
+          <table class="table table-vedic mb-0">
+            <thead>
+              <tr>
+                <th>Planet</th>
+                <th>Transit Rashi</th>
+                <th>Transit °</th>
+                <th>Transit House</th>
+                {% if natal %}<th>Natal Rashi</th><th>Natal House</th>{% endif %}
+                <th>R</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pname, p in transit.planets.items() %}
+              <tr>
+                <td>
+                  <span class="planet-dot" style="background:{{ p.color }}"></span>
+                  <span style="color:{{ p.color }}">{{ p.symbol }}</span> {{ pname }}
+                </td>
+                <td>{{ p.rashi_name }}</td>
+                <td class="font-mono">{{ p.dms }}</td>
+                <td class="text-center">{{ p.house }}</td>
+                {% if natal and pname in natal.planets %}
+                  {% set np = natal.planets[pname] %}
+                  <td {% if np.rashi != p.rashi %}class="text-warning"{% endif %}>
+                    {{ np.rashi_name }}
+                  </td>
+                  <td class="text-center
+                    {% if np.house != p.house %}text-warning{% endif %}">
+                    {{ np.house }}
+                  </td>
+                {% elif natal %}
+                  <td>—</td><td>—</td>
+                {% endif %}
+                <td class="text-center">
+                  {% if p.retrograde %}<span class="retro-badge">℞</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sky now -->
+    <div class="card-vedic mt-4">
+      <div class="card-vedic-header">
+        <i class="bi bi-sunrise-fill me-2"></i>Sky Right Now
+      </div>
+      <div class="card-vedic-body">
+        <div class="sky-grid">
+          <div class="sky-item">
+            <i class="bi bi-sunrise text-sunrise"></i>
+            <div class="sky-label">Sunrise</div>
+            <div class="sky-value" id="t-sunrise">—</div>
+          </div>
+          <div class="sky-item">
+            <i class="bi bi-sunset text-sunset"></i>
+            <div class="sky-label">Sunset</div>
+            <div class="sky-value" id="t-sunset">—</div>
+          </div>
+          <div class="sky-item">
+            <i class="bi bi-moon-stars text-moon"></i>
+            <div class="sky-label">Moonrise</div>
+            <div class="sky-value" id="t-moonrise">—</div>
+          </div>
+          <div class="sky-item">
+            <i class="bi bi-moon text-moon"></i>
+            <div class="sky-label">Moonset</div>
+            <div class="sky-value" id="t-moonset">—</div>
+          </div>
+          <div class="sky-item">
+            <i class="bi bi-brightness-high text-gold"></i>
+            <div class="sky-label">Solar Noon</div>
+            <div class="sky-value" id="t-noon">—</div>
+          </div>
+          <div class="sky-item">
+            <i class="bi bi-hourglass-split text-rahu"></i>
+            <div class="sky-label">Day Length</div>
+            <div class="sky-value" id="t-daylength">—</div>
+          </div>
+        </div>
+        <hr class="divider-gold my-3"/>
+        <div class="row g-2 text-center">
+          <div class="col-4">
+            <div class="kaal-box rahu">
+              <div class="kaal-label">Rahu Kaal</div>
+              <div class="kaal-time" id="t-rahu">—</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="kaal-box gulika">
+              <div class="kaal-label">Gulika Kaal</div>
+              <div class="kaal-time" id="t-gulika">—</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="kaal-box yama">
+              <div class="kaal-label">Yamaghanta</div>
+              <div class="kaal-time" id="t-yama">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card-vedic text-center py-5">
+  <i class="bi bi-stars fs-1 text-gold mb-3"></i>
+  <h4 class="text-gold">Loading transit data…</h4>
+  <p class="text-muted">Fetching current planetary positions.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+<script>
+{% if transit %}
+const transitData = {{ transit | tojson }};
+renderNorthIndianChart("transitCanvas", transitData.house_occupants,
+                        transitData.lagna.rashi, transitData.planets);
+
+// Sky for today
+(function() {
+  const lat = {{ transit.latitude }};
+  const lon = {{ transit.longitude_coord }};
+  const tz  = "{{ tz_str }}";
+  fetch(`/api/sky?lat=${lat}&lon=${lon}&tz=${encodeURIComponent(tz)}`)
+    .then(r => r.json()).then(d => {
+      [["t-sunrise","sunrise"],["t-sunset","sunset"],["t-moonrise","moonrise"],
+       ["t-moonset","moonset"],["t-noon","solar_noon"],["t-daylength","day_length"],
+       ["t-rahu","rahu_kaal"],["t-gulika","gulika_kaal"],["t-yama","yamaghanta"]
+      ].forEach(([id,key]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = d[key] || "—";
+      });
+    }).catch(() => {});
+})();
+
+// Auto-refresh transit every 5 minutes
+setInterval(() => window.location.reload(), 300000);
+{% endif %}
+</script>
+{% endblock %}

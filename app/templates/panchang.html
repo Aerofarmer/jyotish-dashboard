@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Panchang — Jyotish Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4 d-flex justify-content-between align-items-start flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-calendar3 me-2"></i>Daily Panchang</h1>
+    <p class="page-sub">पञ्चाङ्ग — Five limbs of the Hindu almanac</p>
+  </div>
+  {% if panchang %}
+  <div class="text-end">
+    <div class="native-name">{{ panchang.date }}</div>
+    <div class="native-detail">{{ place }}</div>
+    <div class="native-detail text-muted">Ayanamsa: {{ panchang.ayanamsa }}°</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Date + place selector -->
+<div class="card-vedic mb-4">
+  <div class="card-vedic-body">
+    <form method="POST" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label-vedic">Date</label>
+        <input type="date" name="date" class="form-control form-control-vedic"
+               value="{{ panchang.date_iso if panchang else today }}" required/>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label-vedic">Place</label>
+        <input type="text" name="place" id="panch-place"
+               class="form-control form-control-vedic"
+               value="{{ place }}" placeholder="City name"/>
+        <input type="hidden" name="lat" id="panch-lat"/>
+        <input type="hidden" name="lon" id="panch-lon"/>
+        <input type="hidden" name="timezone" id="panch-tz" value="Asia/Kolkata"/>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-vedic w-100">
+          <i class="bi bi-search me-1"></i>Calculate
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if panchang %}
+
+<!-- ── Five Limbs ───────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+  <!-- Vara -->
+  <div class="col-sm-6 col-lg">
+    <div class="panch-card">
+      <div class="panch-icon">🗓️</div>
+      <div class="panch-label">Vara (Weekday)</div>
+      <div class="panch-value">{{ panchang.vara.name }}</div>
+      <div class="panch-sub">Lord: {{ panchang.vara.lord }}</div>
+    </div>
+  </div>
+
+  <!-- Tithi -->
+  <div class="col-sm-6 col-lg">
+    <div class="panch-card {{ 'auspicious' if panchang.tithi.nature == 'Auspicious' else 'inauspicious' if panchang.tithi.nature == 'Inauspicious' else '' }}">
+      <div class="panch-icon">🌙</div>
+      <div class="panch-label">Tithi (Lunar Day)</div>
+      <div class="panch-value">{{ panchang.tithi.paksha }} {{ panchang.tithi.name }}</div>
+      <div class="panch-sub">
+        {{ panchang.tithi.number }}/30 ·
+        {{ panchang.tithi.hours_remaining }}h remaining
+        {% if panchang.tithi.is_ekadashi %}<span class="badge bg-success ms-1">Ekadashi</span>{% endif %}
+        {% if panchang.tithi.is_purnima %}<span class="badge bg-warning text-dark ms-1">Purnima</span>{% endif %}
+        {% if panchang.tithi.is_amavasya %}<span class="badge bg-secondary ms-1">Amavasya</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Nakshatra -->
+  <div class="col-sm-6 col-lg">
+    <div class="panch-card">
+      <div class="panch-icon">⭐</div>
+      <div class="panch-label">Nakshatra</div>
+      <div class="panch-value">{{ panchang.nakshatra.name }}</div>
+      <div class="panch-sub">
+        Pada {{ panchang.nakshatra.pada }} · Lord: {{ panchang.nakshatra.lord }}<br>
+        {{ panchang.nakshatra.hours_remaining }}h remaining
+      </div>
+    </div>
+  </div>
+
+  <!-- Yoga -->
+  <div class="col-sm-6 col-lg">
+    <div class="panch-card {{ 'auspicious' if panchang.yoga.nature == 'Auspicious' else 'inauspicious' }}">
+      <div class="panch-icon">☯️</div>
+      <div class="panch-label">Yoga</div>
+      <div class="panch-value">{{ panchang.yoga.name }}</div>
+      <div class="panch-sub">{{ panchang.yoga.nature }} · {{ panchang.yoga.fraction_elapsed }}% elapsed</div>
+    </div>
+  </div>
+
+  <!-- Karana -->
+  <div class="col-sm-6 col-lg">
+    <div class="panch-card {{ 'inauspicious' if panchang.karana.is_vishti else '' }}">
+      <div class="panch-icon">🔯</div>
+      <div class="panch-label">Karana (Half-Tithi)</div>
+      <div class="panch-value">{{ panchang.karana.name }}</div>
+      <div class="panch-sub">
+        {{ panchang.karana.nature }}
+        {% if panchang.karana.is_vishti %}<span class="badge bg-danger ms-1">Bhadra</span>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Sunrise / Sky row ─────────────────────────────── -->
+{% if sky %}
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-sunrise-fill me-2"></i>Sunrise · Sunset · Moonrise · Moonset
+    <span class="ms-2 text-muted small">{{ place }}</span>
+  </div>
+  <div class="card-vedic-body">
+    <div class="sky-grid-large">
+      <div class="sky-big-item">
+        <div class="sky-big-icon text-sunrise">🌅</div>
+        <div class="sky-big-label">Sunrise</div>
+        <div class="sky-big-value">{{ sky.sunrise }}</div>
+      </div>
+      <div class="sky-big-item">
+        <div class="sky-big-icon text-sunset">🌇</div>
+        <div class="sky-big-label">Sunset</div>
+        <div class="sky-big-value">{{ sky.sunset }}</div>
+      </div>
+      <div class="sky-big-item">
+        <div class="sky-big-icon text-moon">🌕</div>
+        <div class="sky-big-label">Moonrise</div>
+        <div class="sky-big-value">{{ sky.moonrise }}</div>
+      </div>
+      <div class="sky-big-item">
+        <div class="sky-big-icon text-moon">🌑</div>
+        <div class="sky-big-label">Moonset</div>
+        <div class="sky-big-value">{{ sky.moonset }}</div>
+      </div>
+      <div class="sky-big-item">
+        <div class="sky-big-icon text-gold">☀️</div>
+        <div class="sky-big-label">Solar Noon</div>
+        <div class="sky-big-value">{{ sky.solar_noon }}</div>
+      </div>
+      <div class="sky-big-item">
+        <div class="sky-big-icon">⏳</div>
+        <div class="sky-big-label">Day Length</div>
+        <div class="sky-big-value">{{ sky.day_length }}</div>
+      </div>
+    </div>
+
+    <!-- Moon phase bar -->
+    <div class="moon-bar mt-3 d-flex align-items-center gap-3">
+      <span class="fs-2">{{ sky.moon_phase_name[:1] }}</span>
+      <div class="flex-grow-1">
+        <div class="d-flex justify-content-between mb-1">
+          <small class="text-muted">Moon Phase</small>
+          <small class="text-white">{{ sky.moon_phase_name }} — {{ sky.moon_phase_pct }}%</small>
+        </div>
+        <div class="progress" style="height:8px;background:#1a0a2e;">
+          <div class="progress-bar bg-moon" style="width:{{ sky.moon_phase_pct }}%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Inauspicious periods ──────────────────────────── -->
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-exclamation-octagon me-2 text-danger"></i>Inauspicious Periods
+  </div>
+  <div class="card-vedic-body">
+    <div class="row g-3 text-center">
+      <div class="col-md-4">
+        <div class="kaal-box rahu">
+          <div class="kaal-label">☊ Rahu Kaal</div>
+          <div class="kaal-time">{{ sky.rahu_kaal }}</div>
+          <div class="kaal-desc">Avoid new work</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="kaal-box gulika">
+          <div class="kaal-label">☄ Gulika Kaal</div>
+          <div class="kaal-time">{{ sky.gulika_kaal }}</div>
+          <div class="kaal-desc">Saturn's son period</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="kaal-box yama">
+          <div class="kaal-label">⚡ Yamaghanta</div>
+          <div class="kaal-time">{{ sky.yamaghanta }}</div>
+          <div class="kaal-desc">Yama's bell</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Muhurta ────────────────────────────────────────── -->
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-star-fill me-2 text-gold"></i>Auspicious Timings (Muhurta)
+  </div>
+  <div class="card-vedic-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="muhurta-box">
+          <div class="muhurta-label">⭐ Abhijit Muhurta</div>
+          <div class="muhurta-time">{{ panchang.abhijit_muhurta }}</div>
+          <div class="muhurta-desc">Most powerful daily window (solar noon ±24 min)</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="muhurta-box {{ 'auspicious' if panchang.is_auspicious else 'inauspicious' }}">
+          <div class="muhurta-label">
+            {{ '✅' if panchang.is_auspicious else '⚠️' }} Overall Day
+          </div>
+          <div class="muhurta-time">
+            {{ 'Auspicious' if panchang.is_auspicious else 'Mixed / Caution' }}
+          </div>
+          <div class="muhurta-desc">Based on Tithi + Yoga + Karana</div>
+        </div>
+      </div>
+      {% if panchang.tarabala %}
+      <div class="col-md-4">
+        <div class="muhurta-box {{ 'auspicious' if 'Auspicious' in panchang.tarabala.nature else 'inauspicious' }}">
+          <div class="muhurta-label">⭐ Tarabala</div>
+          <div class="muhurta-time">{{ panchang.tarabala.name }} ({{ panchang.tarabala.count }})</div>
+          <div class="muhurta-desc">{{ panchang.tarabala.nature }}</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Sun & Moon Rashi ────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card-vedic">
+      <div class="card-vedic-header">
+        <span class="text-sunrise">☉</span> Sun Position
+      </div>
+      <div class="card-vedic-body text-center py-4">
+        <div class="rashi-display">{{ panchang.sun_rashi.name }}</div>
+        <div class="text-muted">{{ panchang.sun_rashi.degree }}° in sign</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-vedic">
+      <div class="card-vedic-header">
+        <span class="text-moon">☽</span> Moon Position
+        {% if panchang.chandra_bala %}
+          <span class="badge ms-2 {{ 'bg-success' if panchang.chandra_bala.is_favourable else 'bg-danger' }}">
+            Chandra Bala: {{ panchang.chandra_bala.nature }}
+          </span>
+        {% endif %}
+      </div>
+      <div class="card-vedic-body text-center py-4">
+        <div class="rashi-display text-moon">{{ panchang.moon_rashi.name }}</div>
+        <div class="text-muted">{{ panchang.moon_rashi.degree }}° in sign</div>
+        <div class="text-muted small mt-1">
+          Nakshatra: {{ panchang.nakshatra.name }}, Pada {{ panchang.nakshatra.pada }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-geocode place input
+let panTimer;
+document.getElementById("panch-place").addEventListener("input", function() {
+  clearTimeout(panTimer);
+  const q = this.value.trim();
+  if (q.length < 3) return;
+  panTimer = setTimeout(() => {
+    fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+      .then(r => r.json()).then(d => {
+        if (!d.error) {
+          document.getElementById("panch-lat").value = d.lat;
+          document.getElementById("panch-lon").value = d.lon;
+          document.getElementById("panch-tz").value  = d.timezone;
+        }
+      }).catch(() => {});
+  }, 600);
+});
+</script>
+{% endblock %}

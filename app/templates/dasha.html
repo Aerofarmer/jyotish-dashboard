@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Dasha Periods — Jyotish Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <h1 class="page-title"><i class="bi bi-bar-chart-steps me-2"></i>Vimshottari Dasha</h1>
+  <p class="page-sub">विंशोत्तरी दशा — 120-year planetary period system based on Moon nakshatra</p>
+</div>
+
+{% if error %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+  <a href="{{ url_for('main.index') }}" class="alert-link ms-2">Generate Kundli first →</a>
+</div>
+{% endif %}
+
+{% if dasha %}
+
+<!-- Current running periods strip -->
+<div class="row g-3 mb-4">
+  {% if dasha.current_maha %}
+  <div class="col-md-4">
+    <div class="summary-pill" style="border-color:{{ dasha.current_maha.color }}">
+      <div class="sp-label">Mahadasha (Major)</div>
+      <div class="sp-value" style="color:{{ dasha.current_maha.color }}">
+        {{ dasha.current_maha.lord }} Dasha
+      </div>
+      <div class="sp-sub">{{ dasha.current_maha.start }} – {{ dasha.current_maha.end }}</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if dasha.current_antar %}
+  <div class="col-md-4">
+    <div class="summary-pill" style="border-color:{{ dasha.current_antar.color }}">
+      <div class="sp-label">Antardasha (Sub)</div>
+      <div class="sp-value" style="color:{{ dasha.current_antar.color }}">
+        {{ dasha.current_antar.lord }} Bhukti
+      </div>
+      <div class="sp-sub">{{ dasha.current_antar.start }} – {{ dasha.current_antar.end }}</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if dasha.current_pratyantar %}
+  <div class="col-md-4">
+    <div class="summary-pill" style="border-color:{{ dasha.current_pratyantar.color }}">
+      <div class="sp-label">Pratyantardasha (Sub-Sub)</div>
+      <div class="sp-value" style="color:{{ dasha.current_pratyantar.color }}">
+        {{ dasha.current_pratyantar.lord }} Prana
+      </div>
+      <div class="sp-sub">{{ dasha.current_pratyantar.start }} – {{ dasha.current_pratyantar.end }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Birth nakshatra info -->
+<div class="card-vedic mb-4">
+  <div class="card-vedic-body py-2 px-3">
+    <div class="d-flex flex-wrap gap-4 align-items-center">
+      <div>
+        <span class="text-muted small">Birth Nakshatra Lord</span>
+        <div class="fw-bold" style="color:var(--gold)">{{ dasha.birth_lord }}</div>
+      </div>
+      <div>
+        <span class="text-muted small">Dasha Balance at Birth</span>
+        <div class="fw-bold text-white">
+          {{ dasha.balance_years | round(2) }} yrs
+          ({{ dasha.balance_days }} days)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dasha timeline visual -->
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-diagram-3 me-2"></i>120-Year Dasha Timeline
+  </div>
+  <div class="card-vedic-body">
+    <div class="dasha-timeline">
+      {% for maha in dasha.mahadashas %}
+      <div class="dasha-segment {{ 'dasha-current' if maha.is_current else '' }}"
+           style="flex: {{ maha.years }}; background: {{ maha.color }}22;
+                  border-top: 3px solid {{ maha.color }};"
+           title="{{ maha.lord }}: {{ maha.start }} – {{ maha.end }}">
+        <div class="ds-lord" style="color:{{ maha.color }}">{{ maha.lord }}</div>
+        <div class="ds-years">{{ maha.years | round(1) }}y</div>
+        <div class="ds-dates">{{ maha.start[:7] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Mahadasha accordion with Antardashas -->
+<div class="card-vedic">
+  <div class="card-vedic-header">
+    <i class="bi bi-list-nested me-2"></i>Detailed Dasha Periods
+  </div>
+  <div class="card-vedic-body p-0">
+    <div class="accordion accordion-vedic" id="dashaAccordion">
+      {% for maha in dasha.mahadashas %}
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button {{ '' if maha.is_current else 'collapsed' }}"
+                  type="button" data-bs-toggle="collapse"
+                  data-bs-target="#maha{{ loop.index }}">
+            <span class="planet-dot" style="background:{{ maha.color }}"></span>
+            <span style="color:{{ maha.color }}" class="me-2 fw-bold">{{ maha.lord }} Mahadasha</span>
+            <span class="text-muted small me-auto">{{ maha.start }} – {{ maha.end }}
+              ({{ maha.years | round(1) }} yrs)</span>
+            {% if maha.is_current %}
+            <span class="badge bg-success ms-2">CURRENT</span>
+            {% endif %}
+          </button>
+        </h2>
+        <div id="maha{{ loop.index }}"
+             class="accordion-collapse collapse {{ 'show' if maha.is_current else '' }}">
+          <div class="accordion-body p-0">
+            <table class="table table-vedic table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Antardasha (Bhukti)</th>
+                  <th>Start</th><th>End</th><th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for antar in maha.antardashas %}
+                <tr class="{{ 'table-active-dasha' if antar.is_current else '' }}">
+                  <td>
+                    <span class="planet-dot" style="background:{{ antar.color }}"></span>
+                    <span style="color:{{ antar.color }}">{{ maha.lord }}/{{ antar.lord }}</span>
+                    {% if antar.is_current %}<span class="badge bg-success ms-1">NOW</span>{% endif %}
+                  </td>
+                  <td>{{ antar.start }}</td>
+                  <td>{{ antar.end }}</td>
+                  <td>{{ antar.months | round(1) }} mo</td>
+                </tr>
+                {% if antar.is_current %}
+                <tr>
+                  <td colspan="4" class="p-0">
+                    <table class="table table-vedic table-sm mb-0 ms-4">
+                      <thead>
+                        <tr class="text-muted">
+                          <th>Pratyantardasha</th><th>Start</th><th>End</th><th>Days</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for prat in antar.pratyantardashas %}
+                        <tr class="{{ 'table-active-dasha' if prat.is_current else '' }}">
+                          <td>
+                            <span class="planet-dot" style="background:{{ prat.color }}"></span>
+                            <span style="color:{{ prat.color }}">
+                              {{ maha.lord }}/{{ antar.lord }}/{{ prat.lord }}
+                            </span>
+                            {% if prat.is_current %}
+                            <span class="badge bg-warning text-dark ms-1">RUNNING</span>
+                            {% endif %}
+                          </td>
+                          <td>{{ prat.start }}</td>
+                          <td>{{ prat.end }}</td>
+                          <td>{{ prat.days }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

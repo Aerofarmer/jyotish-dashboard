@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Jyotish Dashboard
+GenericName=Vedic Astrology Software
+Comment=Kundli, Panchang, Dasha & Transit charts — Vedic astrology with Swiss Ephemeris
+Exec=bash /opt/jyotish-dashboard/start.sh
+Icon=/opt/jyotish-dashboard/app/static/img/icon.svg
+Terminal=false
+Categories=Education;Science;
+Keywords=astrology;kundli;vedic;panchang;dasha;jyotish;horoscope;
+StartupNotify=true
+StartupWMClass=jyotish-dashboard

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1f1450"/>
+      <stop offset="100%" stop-color="#0d0820"/>
+    </radialGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="31" fill="url(#bg)" stroke="#FFD700" stroke-width="1.5"/>
+  <!-- Outer ring dots (nakshatras) -->
+  <g fill="#FFD700" opacity="0.4">
+    <circle cx="32" cy="4"  r="1.2"/>
+    <circle cx="50" cy="9"  r="1.2"/>
+    <circle cx="60" cy="25" r="1.2"/>
+    <circle cx="60" cy="39" r="1.2"/>
+    <circle cx="50" cy="55" r="1.2"/>
+    <circle cx="32" cy="60" r="1.2"/>
+    <circle cx="14" cy="55" r="1.2"/>
+    <circle cx="4"  cy="39" r="1.2"/>
+    <circle cx="4"  cy="25" r="1.2"/>
+    <circle cx="14" cy="9"  r="1.2"/>
+  </g>
+  <!-- OM symbol -->
+  <text x="32" y="40" font-family="serif" font-size="28" font-weight="bold"
+        fill="#FFD700" text-anchor="middle" dominant-baseline="middle"
+        opacity="0.95">ॐ</text>
+  <!-- Small star accents -->
+  <g fill="#FF6B35" opacity="0.7">
+    <circle cx="18" cy="18" r="1.5"/>
+    <circle cx="46" cy="18" r="1.5"/>
+    <circle cx="18" cy="46" r="1.5"/>
+    <circle cx="46" cy="46" r="1.5"/>
+  </g>
+</svg>

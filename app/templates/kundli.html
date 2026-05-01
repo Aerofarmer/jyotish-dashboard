@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}Kundli Chart — {{ chart.name if chart else 'Jyotish Dashboard' }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4 d-flex justify-content-between align-items-start">
+  <div>
+    <h1 class="page-title"><i class="bi bi-circle-half me-2"></i>Kundli Chart</h1>
+    <p class="page-sub">जन्म कुण्डली — Natal Birth Chart (Sidereal / Lahiri Ayanamsa)</p>
+  </div>
+  {% if chart %}
+  <div class="text-end">
+    <div class="native-name">{{ chart.name or 'Native' }}</div>
+    <div class="native-detail">{{ chart.place }}</div>
+    <div class="native-detail">{{ chart.birth_datetime[:16].replace('T',' ') }} · {{ chart.timezone }}</div>
+    <div class="native-detail text-muted">Ayanamsa: {{ chart.ayanamsa }}°</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if not chart %}
+<!-- No chart yet – show redirect form -->
+<div class="card-vedic text-center py-5">
+  <i class="bi bi-circle-half fs-1 text-gold mb-3"></i>
+  <h4 class="text-gold">No Kundli generated yet</h4>
+  <p class="text-muted mb-4">Please enter birth details to generate the chart.</p>
+  <a href="{{ url_for('main.index') }}" class="btn btn-vedic">
+    <i class="bi bi-arrow-left me-2"></i>Enter Birth Details
+  </a>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if chart %}
+<div class="row g-4">
+
+  <!-- ── Left: North Indian Kundli + Navamsa ───────── -->
+  <div class="col-xl-5">
+
+    <!-- D1 Chart -->
+    <div class="card-vedic mb-4">
+      <div class="card-vedic-header">
+        <i class="bi bi-grid-3x3 me-2"></i>D1 — Rashi Chart (Lagna: {{ chart.lagna.rashi_name }})
+      </div>
+      <div class="card-vedic-body p-2">
+        <canvas id="kundliCanvas" width="440" height="440"
+                class="kundli-canvas"
+                data-chart="{{ chart | tojson | e }}"></canvas>
+      </div>
+    </div>
+
+    <!-- D9 Navamsa -->
+    <div class="card-vedic">
+      <div class="card-vedic-header">
+        <i class="bi bi-grid-3x3-gap me-2"></i>D9 — Navamsa Chart
+      </div>
+      <div class="card-vedic-body p-2">
+        <canvas id="navamsaCanvas" width="440" height="440"
+                class="kundli-canvas"
+                data-navamsa="{{ chart.navamsa | tojson | e }}"
+                data-lagna-rashi="{{ chart.navamsa.Lagna.rashi }}"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right panel ────────────────────────────────── -->
+  <div class="col-xl-7">
+
+    <!-- Lagna + Dasha summary strip -->
+    <div class="row g-3 mb-4">
+      <div class="col-sm-6">
+        <div class="summary-pill" style="border-color:#FFD700">
+          <div class="sp-label">Lagna (Ascendant)</div>
+          <div class="sp-value">{{ chart.lagna.rashi_name }}
+            <small class="text-muted">({{ chart.lagna.rashi_english }})</small>
+          </div>
+          <div class="sp-sub">{{ chart.lagna.dms }} · {{ chart.lagna.nakshatra.name }}</div>
+        </div>
+      </div>
+      {% if dasha and dasha.current_maha %}
+      <div class="col-sm-6">
+        <div class="summary-pill" style="border-color:{{ dasha.current_maha.color }}">
+          <div class="sp-label">Current Mahadasha</div>
+          <div class="sp-value" style="color:{{ dasha.current_maha.color }}">
+            {{ dasha.current_maha.lord }} Dasha
+          </div>
+          <div class="sp-sub">Ends {{ dasha.current_maha.end }}
+            {% if dasha.current_antar %}
+            · {{ dasha.current_antar.lord }} Bhukti
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Planet table -->
+    <div class="card-vedic mb-4">
+      <div class="card-vedic-header">
+        <i class="bi bi-table me-2"></i>Planetary Positions
+      </div>
+      <div class="card-vedic-body p-0">
+        <div class="table-responsive">
+          <table class="table table-vedic mb-0">
+            <thead>
+              <tr>
+                <th>Planet</th><th>Rashi</th><th>Degree</th>
+                <th>House</th><th>Nakshatra</th><th>Dignity</th><th>R</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pname, p in chart.planets.items() %}
+              <tr class="{{ 'retrograde-row' if p.retrograde else '' }}">
+                <td>
+                  <span class="planet-dot" style="background:{{ p.color }}"></span>
+                  <span style="color:{{ p.color }}">{{ p.symbol }}</span>
+                  {{ pname }}
+                </td>
+                <td>{{ p.rashi_name }}</td>
+                <td class="font-mono">{{ p.dms }}</td>
+                <td class="text-center">{{ p.house }}</td>
+                <td>{{ p.nakshatra.name }} (P{{ p.nakshatra.pada }})</td>
+                <td>
+                  <span class="dignity-badge dignity-{{ p.dignity | lower | replace(' ','_') }}">
+                    {{ p.dignity }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  {% if p.retrograde %}<span class="retro-badge">℞</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- House occupants -->
+    <div class="card-vedic mb-4">
+      <div class="card-vedic-header">
+        <i class="bi bi-houses me-2"></i>House Occupants (Bhava)
+      </div>
+      <div class="card-vedic-body">
+        <div class="house-grid">
+          {% for h in chart.houses %}
+          <div class="house-cell {{ 'house-occupied' if chart.house_occupants[h.house] else '' }}">
+            <div class="house-num">{{ h.house }}</div>
+            <div class="house-rashi">{{ h.rashi_name }}</div>
+            <div class="house-planets">
+              {% for p in chart.house_occupants[h.house] %}
+              <span class="planet-chip"
+                    style="color:{{ chart.planets[p].color if p in chart.planets else '#fff' }}">
+                {{ chart.planets[p].symbol if p in chart.planets else '' }}{{ p[:3] }}
+              </span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Sunrise / Sky for birth day -->
+    {% if chart %}
+    <div class="card-vedic">
+      <div class="card-vedic-header">
+        <i class="bi bi-sunrise-fill me-2"></i>Sky on Birth Day
+        <small class="ms-2 text-muted">{{ chart.birth_datetime[:10] }}</small>
+      </div>
+      <div class="card-vedic-body" id="birth-sky-body">
+        <div class="sky-grid" id="birth-sky-grid">
+          <div class="sky-item"><i class="bi bi-sunrise text-sunrise"></i>
+            <div class="sky-label">Sunrise</div><div class="sky-value" id="b-sunrise">—</div></div>
+          <div class="sky-item"><i class="bi bi-sunset text-sunset"></i>
+            <div class="sky-label">Sunset</div><div class="sky-value" id="b-sunset">—</div></div>
+          <div class="sky-item"><i class="bi bi-moon-stars text-moon"></i>
+            <div class="sky-label">Moonrise</div><div class="sky-value" id="b-moonrise">—</div></div>
+          <div class="sky-item"><i class="bi bi-moon text-moon"></i>
+            <div class="sky-label">Moonset</div><div class="sky-value" id="b-moonset">—</div></div>
+          <div class="sky-item"><i class="bi bi-brightness-high text-gold"></i>
+            <div class="sky-label">Solar Noon</div><div class="sky-value" id="b-noon">—</div></div>
+          <div class="sky-item"><i class="bi bi-hourglass text-rahu"></i>
+            <div class="sky-label">Rahu Kaal</div><div class="sky-value" id="b-rahu">—</div></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- /col -->
+</div><!-- /row -->
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+<script>
+{% if chart %}
+// Render D1 chart
+const chartData = {{ chart | tojson }};
+renderNorthIndianChart("kundliCanvas", chartData.house_occupants,
+                        chartData.lagna.rashi, chartData.planets);
+
+// Render D9 Navamsa
+const navData = {{ chart.navamsa | tojson }};
+renderNavamsaChart("navamsaCanvas", navData);
+
+// Load birth-day sky data
+(function() {
+  const lat  = {{ chart.latitude }};
+  const lon  = {{ chart.longitude_coord }};
+  const tz   = "{{ chart.timezone }}";
+  const date = "{{ chart.birth_datetime[:10] }}";
+  fetch(`/api/sky?lat=${lat}&lon=${lon}&tz=${encodeURIComponent(tz)}&date=${date}`)
+    .then(r => r.json()).then(d => {
+      [["b-sunrise","sunrise"],["b-sunset","sunset"],["b-moonrise","moonrise"],
+       ["b-moonset","moonset"],["b-noon","solar_noon"],["b-rahu","rahu_kaal"]
+      ].forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = d[key] || "—";
+      });
+    }).catch(() => {});
+})();
+{% endif %}
+</script>
+{% endblock %}
