@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jyotish",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /Users/amrit/Desktop/CLaude/kundli-dashboard && PORT=5001 SE_EPHE_PATH=./ephe .venv/bin/python run.py"],
+      "port": 5001
+    }
+  ]
+}
