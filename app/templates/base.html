@@ -58,6 +58,12 @@
         <i class="bi bi-calendar3"></i> Panchang
       </a>
     </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'main.predictions' %}active{% endif %}"
+         href="{{ url_for('main.predictions') }}">
+        <i class="bi bi-magic"></i> Predictions
+      </a>
+    </li>
   </ul>
 
   <div class="sidebar-footer">

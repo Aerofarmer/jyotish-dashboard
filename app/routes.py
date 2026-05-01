@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 from datetime import datetime, date
 import pytz
 import traceback
@@ -6,18 +6,21 @@ import traceback
 from .astrology.calculator import calculate_full_chart, calculate_transit_chart, get_sunrise_sunset_moonrise
 from .astrology.dasha import calculate_vimshottari, dasha_summary
 from .astrology.panchang import calculate_panchang
+from .astrology.store import save_chart, list_charts, get_chart, delete_chart
+from .astrology.predictions import generate_predictions
 from .api.external import geocode_place, get_ip_location
 
 main = Blueprint("main", __name__)
 
 
 # ─────────────────────────────────────────────
-#  Home — birth-data input form
+#  Home — birth-data input + saved charts
 # ─────────────────────────────────────────────
 @main.route("/")
 def index():
-    ip_loc = get_ip_location()
-    return render_template("index.html", ip_loc=ip_loc)
+    ip_loc   = get_ip_location()
+    saved    = list_charts()
+    return render_template("index.html", ip_loc=ip_loc, saved_charts=saved)
 
 
 # ─────────────────────────────────────────────
@@ -28,13 +31,12 @@ def kundli():
     error = None
     chart = None
     dasha = None
-    nav_chart = None
 
     if request.method == "POST":
         try:
             name   = request.form.get("name", "").strip()
-            dob    = request.form.get("dob", "")          # YYYY-MM-DD
-            tob    = request.form.get("tob", "")          # HH:MM
+            dob    = request.form.get("dob", "")
+            tob    = request.form.get("tob", "")
             place  = request.form.get("place", "").strip()
             lat    = request.form.get("lat", "")
             lon    = request.form.get("lon", "")
@@ -43,7 +45,6 @@ def kundli():
             if not dob or not tob:
                 raise ValueError("Date and time of birth are required.")
 
-            # Geocode if lat/lon not provided
             if not lat or not lon:
                 if not place:
                     raise ValueError("Enter a place or coordinates.")
@@ -59,26 +60,81 @@ def kundli():
                 lon = float(lon)
 
             birth_dt = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
-            chart = calculate_full_chart(birth_dt, float(lat), float(lon), tz_str, name=name, place=place)
+            chart = calculate_full_chart(birth_dt, float(lat), float(lon),
+                                         tz_str, name=name, place=place)
 
-            moon_lon   = chart["planets"]["Moon"]["longitude"]
-            dasha_data = calculate_vimshottari(moon_lon, birth_dt)
-            dasha      = dasha_data
+            moon_lon = chart["planets"]["Moon"]["longitude"]
+            dasha    = calculate_vimshottari(moon_lon, birth_dt)
 
-            # Store in session for transit comparison
-            session["birth_lat"]  = float(lat)
-            session["birth_lon"]  = float(lon)
-            session["birth_tz"]   = tz_str
-            session["birth_name"] = name
-            session["birth_place"]= place
-            session["birth_dob"]  = dob
-            session["birth_tob"]  = tob
+            # Persist in session for transit/dasha/predictions
+            session["birth_lat"]   = float(lat)
+            session["birth_lon"]   = float(lon)
+            session["birth_tz"]    = tz_str
+            session["birth_name"]  = name
+            session["birth_place"] = place
+            session["birth_dob"]   = dob
+            session["birth_tob"]   = tob
 
         except Exception as e:
             error = str(e)
             traceback.print_exc()
 
     return render_template("kundli.html", chart=chart, dasha=dasha, error=error)
+
+
+# ─────────────────────────────────────────────
+#  Save chart
+# ─────────────────────────────────────────────
+@main.route("/kundli/save", methods=["POST"])
+def save_kundli():
+    data = request.get_json(silent=True) or {}
+    chart_data = data.get("chart")
+    if not chart_data:
+        return jsonify({"error": "No chart data"}), 400
+    cid = save_chart(chart_data)
+    return jsonify({"id": cid, "message": "Chart saved successfully"})
+
+
+# ─────────────────────────────────────────────
+#  Load saved chart
+# ─────────────────────────────────────────────
+@main.route("/kundli/load/<cid>")
+def load_kundli(cid):
+    chart = get_chart(cid)
+    if not chart:
+        flash("Chart not found.", "danger")
+        return redirect(url_for("main.index"))
+
+    # Reconstitute session from saved chart
+    session["birth_lat"]   = chart.get("latitude", 28.6139)
+    session["birth_lon"]   = chart.get("longitude_coord", 77.2090)
+    session["birth_tz"]    = chart.get("timezone", "Asia/Kolkata")
+    session["birth_name"]  = chart.get("name", "")
+    session["birth_place"] = chart.get("place", "")
+    bd = chart.get("birth_datetime", "")[:16]
+    if "T" in bd:
+        session["birth_dob"] = bd[:10]
+        session["birth_tob"] = bd[11:16]
+
+    # Recompute dasha from saved moon longitude
+    dasha = None
+    try:
+        moon_lon = chart["planets"]["Moon"]["longitude"]
+        birth_dt = datetime.fromisoformat(chart["birth_datetime"])
+        dasha = calculate_vimshottari(moon_lon, birth_dt)
+    except Exception:
+        pass
+
+    return render_template("kundli.html", chart=chart, dasha=dasha, error=None)
+
+
+# ─────────────────────────────────────────────
+#  Delete saved chart
+# ─────────────────────────────────────────────
+@main.route("/kundli/delete/<cid>", methods=["POST"])
+def delete_kundli(cid):
+    delete_chart(cid)
+    return jsonify({"ok": True})
 
 
 # ─────────────────────────────────────────────
@@ -94,26 +150,29 @@ def transit():
 
     transit_data = calculate_transit_chart(float(lat), float(lon), tz_str)
 
-    # Natal chart for comparison
     natal_chart = None
     dob = session.get("birth_dob")
     tob = session.get("birth_tob")
     if dob and tob:
         try:
             birth_dt = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
-            natal_chart = calculate_full_chart(birth_dt, float(lat), float(lon), tz_str,
-                                               name=name, place=place)
+            natal_chart = calculate_full_chart(birth_dt, float(lat), float(lon),
+                                               tz_str, name=name, place=place)
         except Exception:
             pass
+
+    # Build nakshatra-in-house mapping for transit
+    nak_house_map = _build_nak_house_map(transit_data, natal_chart)
 
     return render_template("transit.html",
                            transit=transit_data,
                            natal=natal_chart,
+                           nak_house_map=nak_house_map,
                            tz_str=tz_str)
 
 
 # ─────────────────────────────────────────────
-#  Dasha chart
+#  Dasha
 # ─────────────────────────────────────────────
 @main.route("/dasha")
 def dasha():
@@ -142,30 +201,65 @@ def dasha():
 
 
 # ─────────────────────────────────────────────
+#  Predictions
+# ─────────────────────────────────────────────
+@main.route("/predictions")
+def predictions():
+    dob   = session.get("birth_dob")
+    tob   = session.get("birth_tob")
+    lat   = session.get("birth_lat", 28.6139)
+    lon   = session.get("birth_lon", 77.2090)
+    tz    = session.get("birth_tz", "Asia/Kolkata")
+    name  = session.get("birth_name", "Native")
+    place = session.get("birth_place", "")
+
+    preds  = None
+    error  = None
+
+    if not (dob and tob):
+        error = "Please generate a Kundli first to see today's predictions."
+        return render_template("predictions.html", preds=None, error=error)
+
+    try:
+        birth_dt      = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
+        natal_chart   = calculate_full_chart(birth_dt, float(lat), float(lon),
+                                             tz, name=name, place=place)
+        transit_data  = calculate_transit_chart(float(lat), float(lon), tz)
+        moon_lon      = natal_chart["planets"]["Moon"]["longitude"]
+        dasha_data    = calculate_vimshottari(moon_lon, birth_dt)
+        preds         = generate_predictions(natal_chart, transit_data,
+                                             dasha_data, float(lat), float(lon), tz)
+    except Exception as e:
+        error = str(e)
+        traceback.print_exc()
+
+    return render_template("predictions.html", preds=preds, error=error,
+                           name=name, place=place)
+
+
+# ─────────────────────────────────────────────
 #  Panchang
 # ─────────────────────────────────────────────
 @main.route("/panchang", methods=["GET", "POST"])
 def panchang():
-    error      = None
+    error         = None
     panchang_data = None
-    sky_data   = None
+    sky_data      = None
 
-    # Default to today + user location
-    today     = date.today()
-    lat       = session.get("birth_lat", 28.6139)
-    lon       = session.get("birth_lon", 77.2090)
-    tz_str    = session.get("birth_tz", "Asia/Kolkata")
-    place     = session.get("birth_place", "New Delhi")
+    today  = date.today()
+    lat    = session.get("birth_lat", 28.6139)
+    lon    = session.get("birth_lon", 77.2090)
+    tz_str = session.get("birth_tz", "Asia/Kolkata")
+    place  = session.get("birth_place", "New Delhi")
 
-    # Birth nakshatra for Tarabala / Chandra Bala
     birth_nak_idx = None
     dob = session.get("birth_dob")
     tob = session.get("birth_tob")
     if dob and tob:
         try:
             birth_dt = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
-            from .astrology.calculator import datetime_to_jd, get_planet_position
             import swisseph as swe_mod
+            from .astrology.calculator import datetime_to_jd, get_planet_position
             jd = datetime_to_jd(birth_dt, tz_str)
             moon_pos = get_planet_position(jd, swe_mod.MOON)
             from .astrology.panchang import NAK_SPAN
@@ -193,30 +287,28 @@ def panchang():
                     tz_str = geo["timezone"]
                     place  = geo.get("display_name", place_q)
 
-            target_date = date.fromisoformat(date_str)
-            panchang_data = calculate_panchang(target_date, float(lat), float(lon), tz_str, birth_nak_idx)
+            target_date   = date.fromisoformat(date_str)
+            panchang_data = calculate_panchang(target_date, float(lat), float(lon),
+                                               tz_str, birth_nak_idx)
             sky_data = panchang_data["sky"]
-
         except Exception as e:
             error = str(e)
             traceback.print_exc()
     else:
         try:
-            panchang_data = calculate_panchang(today, float(lat), float(lon), tz_str, birth_nak_idx)
+            panchang_data = calculate_panchang(today, float(lat), float(lon),
+                                               tz_str, birth_nak_idx)
             sky_data = panchang_data["sky"]
         except Exception as e:
             error = str(e)
 
     return render_template("panchang.html",
-                           panchang=panchang_data,
-                           sky=sky_data,
-                           place=place,
-                           today=today.isoformat(),
-                           error=error)
+                           panchang=panchang_data, sky=sky_data,
+                           place=place, today=today.isoformat(), error=error)
 
 
 # ─────────────────────────────────────────────
-#  JSON API endpoints
+#  JSON API
 # ─────────────────────────────────────────────
 @main.route("/api/geocode")
 def api_geocode():
@@ -228,7 +320,6 @@ def api_geocode():
 
 @main.route("/api/sky")
 def api_sky():
-    """Real-time sunrise/sunset/moonrise for a location."""
     try:
         lat    = float(request.args.get("lat", 28.6139))
         lon    = float(request.args.get("lon", 77.2090))
@@ -265,3 +356,64 @@ def api_transit():
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+@main.route("/api/saved-charts")
+def api_saved_charts():
+    return jsonify(list_charts())
+
+
+# ─────────────────────────────────────────────
+#  Helpers
+# ─────────────────────────────────────────────
+def _build_nak_house_map(transit_data: dict, natal_chart: dict | None) -> list:
+    """
+    For each transit planet: which natal house it occupies,
+    which nakshatra it's in, and warning level.
+    """
+    from .astrology.predictions import TRANSIT_NAKSHATRA_WARNINGS, NAKSHATRA_MEANINGS, NAK_SPAN
+    from .astrology.calculator import NAKSHATRA_NAMES, NAKSHATRA_LORDS, PLANET_COLORS
+
+    if not natal_chart:
+        return []
+
+    lagna_house_map = {h["rashi"]: h["house"] for h in natal_chart["houses"]}
+    result = []
+
+    for p_name, p_data in transit_data["planets"].items():
+        t_rashi     = p_data["rashi"]
+        natal_house = lagna_house_map.get(t_rashi)
+        nak_idx     = int(p_data["longitude"] / NAK_SPAN)
+        nak_name    = NAKSHATRA_NAMES[nak_idx]
+        nak_lord    = NAKSHATRA_LORDS[nak_idx]
+        nak_meaning = NAKSHATRA_MEANINGS.get(nak_name, "")
+        nak_warning = TRANSIT_NAKSHATRA_WARNINGS.get(nak_name)
+
+        # Natal planet in same house?
+        natal_house_occupants = []
+        if natal_house:
+            natal_house_occupants = natal_chart["house_occupants"].get(natal_house, [])
+
+        result.append({
+            "planet":      p_name,
+            "symbol":      p_data.get("symbol", ""),
+            "color":       PLANET_COLORS.get(p_name, "#fff"),
+            "rashi":       p_data["rashi_name"],
+            "longitude":   round(p_data["longitude"], 2),
+            "dms":         p_data["dms"],
+            "retrograde":  p_data.get("retrograde", False),
+            "natal_house": natal_house,
+            "natal_occupants": natal_house_occupants,
+            "nakshatra":   nak_name,
+            "nak_pada":    int((p_data["longitude"] % (360/27)) / (360/108)) + 1,
+            "nak_lord":    nak_lord,
+            "nak_meaning": nak_meaning,
+            "nak_warning": nak_warning,
+            "warning_level": (
+                nak_warning[0] if nak_warning else
+                "warning" if p_name in ("Saturn","Rahu","Ketu") else
+                "positive" if p_name in ("Jupiter","Venus") else "neutral"
+            ),
+        })
+
+    return result

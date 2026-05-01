@@ -158,9 +158,70 @@
           <div>Transit</div>
         </a>
       </div>
+      <div class="col-6">
+        <a href="{{ url_for('main.predictions') }}" class="quick-card">
+          <i class="bi bi-magic fs-2"></i>
+          <div>Predictions</div>
+        </a>
+      </div>
+      <div class="col-6">
+        <a href="{{ url_for('main.dasha') }}" class="quick-card">
+          <i class="bi bi-bar-chart-steps fs-2"></i>
+          <div>Dasha</div>
+        </a>
+      </div>
     </div>
   </div>
 </div>
+
+<!-- Saved Charts -->
+{% if saved_charts %}
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card-vedic">
+      <div class="card-vedic-header">
+        <i class="bi bi-floppy me-2"></i>Saved Charts
+        <span class="badge badge-location ms-2">{{ saved_charts|length }}</span>
+      </div>
+      <div class="card-vedic-body p-0">
+        <div class="table-responsive">
+          <table class="table table-vedic mb-0">
+            <thead>
+              <tr>
+                <th>Name</th><th>Birth Date &amp; Time</th>
+                <th>Place</th><th>Lagna</th><th>Saved</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in saved_charts %}
+              <tr>
+                <td class="fw-bold" style="color:var(--gold)">{{ c.name or '—' }}</td>
+                <td class="font-mono">{{ c.birth_datetime[:16].replace('T',' ') }}</td>
+                <td class="text-muted small">{{ c.place[:30] if c.place else '—' }}</td>
+                <td>{{ c.lagna.rashi_name if c.lagna else '—' }}</td>
+                <td class="text-muted small">{{ c.saved_at[:10] }}</td>
+                <td>
+                  <div class="d-flex gap-2">
+                    <a href="{{ url_for('main.load_kundli', cid=c.id) }}"
+                       class="btn btn-vedic btn-xs">
+                      <i class="bi bi-folder2-open"></i> Load
+                    </a>
+                    <button class="btn btn-outline-danger btn-xs"
+                            onclick="deleteChart('{{ c.id }}', this)">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -244,5 +305,14 @@ document.getElementById("place-input").addEventListener("input", function() {
       }).catch(() => {});
   }, 600);
 });
+
+// ── Delete saved chart ──────────────────────────────────
+function deleteChart(id, btn) {
+  if (!confirm("Delete this saved chart?")) return;
+  fetch(`/kundli/delete/${id}`, { method: "POST" })
+    .then(r => r.json()).then(d => {
+      if (d.ok) btn.closest("tr").remove();
+    }).catch(() => {});
+}
 </script>
 {% endblock %}

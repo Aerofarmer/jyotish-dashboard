@@ -8,11 +8,22 @@
     <p class="page-sub">जन्म कुण्डली — Natal Birth Chart (Sidereal / Lahiri Ayanamsa)</p>
   </div>
   {% if chart %}
-  <div class="text-end">
+  <div class="text-end d-flex flex-column align-items-end gap-2">
     <div class="native-name">{{ chart.name or 'Native' }}</div>
     <div class="native-detail">{{ chart.place }}</div>
     <div class="native-detail">{{ chart.birth_datetime[:16].replace('T',' ') }} · {{ chart.timezone }}</div>
     <div class="native-detail text-muted">Ayanamsa: {{ chart.ayanamsa }}°</div>
+    <div class="d-flex gap-2 mt-1">
+      <button id="save-btn" class="btn btn-outline-gold btn-sm" onclick="saveChart()">
+        <i class="bi bi-floppy me-1"></i>Save Chart
+      </button>
+      <a href="{{ url_for('main.predictions') }}" class="btn btn-vedic btn-sm">
+        <i class="bi bi-magic me-1"></i>Today's Predictions
+      </a>
+    </div>
+    <div id="save-msg" class="text-success small" style="display:none">
+      <i class="bi bi-check-circle me-1"></i>Saved!
+    </div>
   </div>
   {% endif %}
 </div>
@@ -198,16 +209,13 @@
 <script src="{{ url_for('static', filename='js/chart.js') }}"></script>
 <script>
 {% if chart %}
-// Render D1 chart
 const chartData = {{ chart | tojson }};
 renderNorthIndianChart("kundliCanvas", chartData.house_occupants,
                         chartData.lagna.rashi, chartData.planets);
-
-// Render D9 Navamsa
 const navData = {{ chart.navamsa | tojson }};
 renderNavamsaChart("navamsaCanvas", navData);
 
-// Load birth-day sky data
+// Birth-day sky
 (function() {
   const lat  = {{ chart.latitude }};
   const lon  = {{ chart.longitude_coord }};
@@ -223,6 +231,30 @@ renderNavamsaChart("navamsaCanvas", navData);
       });
     }).catch(() => {});
 })();
+
+// Save chart to server
+function saveChart() {
+  const btn = document.getElementById("save-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Saving…';
+  fetch("/kundli/save", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ chart: chartData })
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Save Chart';
+    btn.disabled = false;
+    if (d.id) {
+      const msg = document.getElementById("save-msg");
+      msg.style.display = "block";
+      msg.textContent = `✓ Saved (ID: ${d.id})`;
+      setTimeout(() => msg.style.display = "none", 4000);
+    }
+  })
+  .catch(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Save Chart'; });
+}
 {% endif %}
 </script>
 {% endblock %}

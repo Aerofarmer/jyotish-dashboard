@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+{% block title %}Today's Predictions — {{ name or 'Jyotish Dashboard' }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-magic me-2"></i>Today's Predictions</h1>
+    <p class="page-sub">आज का राशिफल — Based on transit, dasha &amp; panchang</p>
+  </div>
+  {% if preds %}
+  <div class="text-end">
+    <div class="native-name">{{ name }}</div>
+    <div class="native-detail">{{ place }}</div>
+    <div class="native-detail text-muted">{{ preds.date }}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if error %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+  <a href="{{ url_for('main.index') }}" class="alert-link ms-2">Generate Kundli first →</a>
+</div>
+{% endif %}
+
+{% if preds %}
+
+{# ── ALERTS: Sade Sati / Kantaka ──────────────────────────────────────── #}
+{% if preds.sade_sati %}
+<div class="alert-vedic danger mb-3">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  <strong>{{ preds.sade_sati.phase }}</strong> — {{ preds.sade_sati.message }}
+</div>
+{% endif %}
+{% if preds.kantaka_shani %}
+<div class="alert-vedic warning mb-3">
+  <i class="bi bi-exclamation-circle-fill me-2"></i>{{ preds.kantaka_shani.message }}
+</div>
+{% endif %}
+
+{# ── ROW 1: Overall score + Day lord + Dasha ─────────────────────────── #}
+<div class="row g-3 mb-4">
+
+  {# Overall Score #}
+  <div class="col-md-4">
+    <div class="card-vedic h-100">
+      <div class="card-vedic-header"><i class="bi bi-stars me-2"></i>Overall Day Score</div>
+      <div class="card-vedic-body d-flex align-items-center gap-4">
+        <div class="score-circle" style="border-color:{{ preds.score_color }};color:{{ preds.score_color }}">
+          <div class="score-num">{{ preds.score }}</div>
+          <div class="score-label-sm">/ 10</div>
+        </div>
+        <div>
+          <div class="fw-bold fs-5" style="color:{{ preds.score_color }}">{{ preds.score_label }}</div>
+          <div class="text-muted small mt-1">
+            Yoga: <span class="text-white">{{ preds.yoga_name }}</span><br>
+            Tithi: <span class="text-white">{{ preds.tithi_name }}</span><br>
+            Day: <span class="text-white">{{ preds.panchang.vara.name }}</span>
+              (Lord: <span style="color:{{ preds.maha_color }}">{{ preds.panchang.vara.lord }}</span>)
+          </div>
+          <div class="mt-2">
+            <span class="warning-pill {{ 'positive' if preds.panchang_ok else 'caution' }}">
+              {{ '✓ Auspicious Day' if preds.panchang_ok else '⚠ Mixed Day' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Day Lord info #}
+  <div class="col-md-4">
+    <div class="card-vedic h-100">
+      <div class="card-vedic-header"><i class="bi bi-sun me-2"></i>Today's Ruling Planet</div>
+      <div class="card-vedic-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="planet-big-icon" style="color:{{ preds.day_info.color }}">
+            {{ preds.day_info.vara_lord[0] }}
+          </div>
+          <div>
+            <div class="fw-bold fs-5" style="color:{{ preds.day_info.color }}">
+              {{ preds.day_info.vara_lord }}
+            </div>
+            <div class="text-muted small">Vara Lord (Day Ruler)</div>
+          </div>
+        </div>
+        <div class="row g-2 text-center">
+          <div class="col-4">
+            <div class="dayinfo-box">
+              <div class="dayinfo-label">Color</div>
+              <div class="dayinfo-val">{{ preds.day_info.favorable_color }}</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="dayinfo-box">
+              <div class="dayinfo-label">Number</div>
+              <div class="dayinfo-val">{{ preds.day_info.lucky_number }}</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="dayinfo-box">
+              <div class="dayinfo-label">Mantra</div>
+              <div class="dayinfo-val small">{{ preds.day_info.mantra[:12] }}…</div>
+            </div>
+          </div>
+        </div>
+        <hr class="divider-gold my-2"/>
+        <div class="d-flex gap-3 small">
+          <div>
+            <span class="text-muted">Friend:</span>
+            {% for f in preds.day_info.friends[:3] %}
+            <span class="warning-pill positive ms-1" style="padding:2px 6px">{{ f }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="d-flex gap-3 small mt-1">
+          <div>
+            <span class="text-muted">Enemy:</span>
+            {% for e in preds.day_info.enemies[:3] %}
+            <span class="warning-pill danger ms-1" style="padding:2px 6px">{{ e }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Running Dasha #}
+  <div class="col-md-4">
+    <div class="card-vedic h-100">
+      <div class="card-vedic-header"><i class="bi bi-bar-chart-steps me-2"></i>Running Dasha</div>
+      <div class="card-vedic-body">
+        <div class="dasha-strip mb-2" style="border-color:{{ preds.maha_color }}">
+          <div class="ds-strip-label">Mahadasha</div>
+          <div class="ds-strip-planet" style="color:{{ preds.maha_color }}">{{ preds.maha_lord }}</div>
+          <div class="ds-strip-end text-muted small">Until {{ preds.maha_end }}</div>
+        </div>
+        <div class="dasha-strip mb-2" style="border-color:{{ preds.antar_color }}">
+          <div class="ds-strip-label">Antardasha</div>
+          <div class="ds-strip-planet" style="color:{{ preds.antar_color }}">{{ preds.antar_lord }}</div>
+          <div class="ds-strip-end text-muted small">Until {{ preds.antar_end }}</div>
+        </div>
+        <div class="dasha-strip" style="border-color:{{ preds.prat_color }}">
+          <div class="ds-strip-label">Pratyantardasha</div>
+          <div class="ds-strip-planet" style="color:{{ preds.prat_color }}">{{ preds.prat_lord }}</div>
+        </div>
+        <div class="mt-3">
+          <p class="small text-muted mb-0">{{ preds.dasha_text }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── ROW 2: Mana Ki Baat (Emotional) + Enemy of Day ──────────────────── #}
+<div class="row g-3 mb-4">
+
+  {# Mana Ki Baat #}
+  <div class="col-md-8">
+    <div class="card-vedic h-100">
+      <div class="card-vedic-header">
+        <i class="bi bi-heart-pulse me-2" style="color:#FF69B4"></i>
+        मन की बात — Emotional &amp; Mental State
+      </div>
+      <div class="card-vedic-body">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <div class="emo-block">
+              <div class="emo-label">Current Mood</div>
+              <div class="emo-value" style="color:#FF69B4">{{ preds.emo_label }}</div>
+              <div class="emo-detail">{{ preds.emo_detail }}</div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="emo-block">
+              <div class="emo-label">Moon Phase Influence</div>
+              <div class="emo-value text-moon">{{ preds.moon_phase }}</div>
+              <div class="emo-detail">{{ preds.moon_phase_mood }}</div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="emo-block">
+              <div class="emo-label">Emotional Ruling Planet</div>
+              <div class="emo-value" style="color:{{ preds.moon_nak_lord_color }}">
+                {{ preds.moon_nak_lord }}
+              </div>
+              <div class="emo-detail">
+                Moon in <strong>{{ preds.moon_nak }}</strong> nakshatra
+                (Lord: {{ preds.moon_nak_lord }}) — {{ preds.moon_nak_meaning }}
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="emo-block">
+              <div class="emo-label">Moon Position from Natal</div>
+              <div class="emo-value text-gold">
+                House {{ preds.moon_house_from_natal }}
+              </div>
+              <div class="emo-detail">
+                Transit Moon is in house {{ preds.moon_house_from_natal }}
+                from your natal Moon sign.
+                {% if preds.moon_house_from_natal in [1,5,9] %}
+                <span class="warning-pill positive ms-1">Favorable</span>
+                {% elif preds.moon_house_from_natal in [6,8,12] %}
+                <span class="warning-pill warning ms-1">Challenging</span>
+                {% else %}
+                <span class="warning-pill neutral ms-1">Neutral</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% if preds.moon_nak_warning %}
+        <div class="alert-vedic {{ preds.moon_nak_warning[0] }} mt-3">
+          <i class="bi bi-moon-stars me-2"></i>
+          <strong>{{ preds.moon_nak }}</strong> alert: {{ preds.moon_nak_warning[1] }}
+        </div>
+        {% endif %}
+        <div class="mt-3 small text-muted">
+          <strong style="color:var(--gold)">Antardasha influence:</strong> {{ preds.antar_text }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Enemy / Friend of the Day #}
+  <div class="col-md-4">
+    <div class="card-vedic h-100">
+      <div class="card-vedic-header">
+        <i class="bi bi-shield-exclamation me-2" style="color:#ef4444"></i>
+        Enemy &amp; Friend Planets Today
+      </div>
+      <div class="card-vedic-body">
+        <div class="mb-3">
+          <div class="emo-label mb-2">⚔ Enemy Planets</div>
+          {% for e in preds.day_info.enemies %}
+          <div class="enemy-row mb-2">
+            <span class="planet-dot" style="background:{{ {'Sun':'#FF6B35','Moon':'#C8D8E8','Mars':'#FF4444','Mercury':'#00CC88','Jupiter':'#FFD700','Venus':'#FF69B4','Saturn':'#9CA3AF','Rahu':'#8B5CF6','Ketu':'#EC4899'}.get(e,'#fff') }}"></span>
+            <span class="warning-pill danger">{{ e }}</span>
+            <span class="text-muted small ms-2">— avoid {{ e }}-related activities</span>
+          </div>
+          {% endfor %}
+        </div>
+        <hr class="divider-gold"/>
+        <div>
+          <div class="emo-label mb-2">✦ Friend Planets</div>
+          {% for f in preds.day_info.friends %}
+          <div class="enemy-row mb-2">
+            <span class="planet-dot" style="background:{{ {'Sun':'#FF6B35','Moon':'#C8D8E8','Mars':'#FF4444','Mercury':'#00CC88','Jupiter':'#FFD700','Venus':'#FF69B4','Saturn':'#9CA3AF','Rahu':'#8B5CF6','Ketu':'#EC4899'}.get(f,'#fff') }}"></span>
+            <span class="warning-pill positive">{{ f }}</span>
+            <span class="text-muted small ms-2">— favorable influence</span>
+          </div>
+          {% endfor %}
+        </div>
+        <hr class="divider-gold mt-2"/>
+        <div class="text-muted small">
+          <i class="bi bi-lightbulb me-1 text-gold"></i>
+          Mantra for today:<br>
+          <span class="text-white">{{ preds.day_info.mantra }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── ROW 3: Love + Career ────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+
+  {# Love #}
+  <div class="col-md-6">
+    <div class="card-vedic h-100">
+      <div class="card-vedic-header">
+        <i class="bi bi-heart-fill me-2" style="color:#FF69B4"></i>
+        प्रेम — Love &amp; Relationships
+        <span class="warning-pill {{ preds.love_severity }} ms-auto">
+          {{ preds.love_severity | title }}
+        </span>
+      </div>
+      <div class="card-vedic-body">
+        <div class="love-overall mb-3">
+          <i class="bi bi-info-circle me-1 text-gold"></i>
+          {{ preds.love_overall }}
+        </div>
+        {% if preds.love_texts %}
+          {% for l in preds.love_texts %}
+          <div class="pred-card {{ l.severity }} mb-2">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span style="color:{{ l.color }};font-size:1.1rem">{{ l.symbol }}</span>
+              <span class="pred-planet" style="color:{{ l.color }}">{{ l.planet }}</span>
+              <span class="text-muted small">in House {{ l.house }}</span>
+              <span class="warning-pill {{ l.severity }} ms-auto" style="font-size:0.65rem">{{ l.severity }}</span>
+            </div>
+            <div class="pred-text">{{ l.text }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted small">
+            <i class="bi bi-heart me-1"></i>
+            No major planetary triggers in love houses today.
+            Steady, calm energy in relationships.
+            {% if preds.venus_retro %}
+            <span class="warning-pill warning mt-1">Venus Retrograde — avoid new commitments.</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Career #}
+  <div class="col-md-6">
+    <div class="card-vedic h-100">
+      <div class="card-vedic-header">
+        <i class="bi bi-briefcase-fill me-2" style="color:#FFD700"></i>
+        करियर — Career &amp; Finance
+        <span class="warning-pill {{ preds.career_severity }} ms-auto">
+          {{ preds.career_severity | title }}
+        </span>
+      </div>
+      <div class="card-vedic-body">
+        <div class="love-overall mb-3">
+          <i class="bi bi-info-circle me-1 text-gold"></i>
+          {{ preds.dasha_career }}
+        </div>
+        {% if preds.career_texts %}
+          {% for c in preds.career_texts %}
+          <div class="pred-card {{ c.severity }} mb-2">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span style="color:{{ c.color }};font-size:1.1rem">{{ c.symbol }}</span>
+              <span class="pred-planet" style="color:{{ c.color }}">{{ c.planet }}</span>
+              <span class="text-muted small">in House {{ c.house }}</span>
+              <span class="warning-pill {{ c.severity }} ms-auto" style="font-size:0.65rem">{{ c.severity }}</span>
+            </div>
+            <div class="pred-text">{{ c.text }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted small">
+            <i class="bi bi-briefcase me-1"></i>
+            No major planetary triggers in career houses today.
+            Focus on steady, disciplined work and existing tasks.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── ROW 4: Major Changes ─────────────────────────────────────────────── #}
+{% if preds.change_alerts %}
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-arrow-repeat me-2" style="color:#8B5CF6"></i>
+    बड़े बदलाव — Major Life Changes &amp; Karmic Transits
+  </div>
+  <div class="card-vedic-body">
+    <div class="row g-3">
+      {% for c in preds.change_alerts %}
+      <div class="col-md-6">
+        <div class="pred-card {{ c.severity }}">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="planet-dot" style="background:{{ c.color }}"></span>
+            <span class="fw-bold" style="color:{{ c.color }}">{{ c.planet }}</span>
+            {% if c.house %}<span class="text-muted small">House {{ c.house }}</span>{% endif %}
+            <span class="warning-pill {{ c.severity }} ms-auto">{{ c.severity | title }}</span>
+          </div>
+          <p class="pred-text mb-0">{{ c.message }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── ROW 5: Planet-by-planet grid ─────────────────────────────────────── #}
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-grid-3x3 me-2"></i>
+    ग्रह विवरण — Planet-by-Planet Transit Forecast
+  </div>
+  <div class="card-vedic-body p-0">
+    <div class="table-responsive">
+      <table class="table table-vedic mb-0">
+        <thead>
+          <tr>
+            <th>Planet</th><th>Transit Position</th><th>Nakshatra</th>
+            <th>Natal House</th><th>Area</th><th>Forecast</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in preds.planet_forecasts %}
+          <tr class="nak-house-row">
+            <td>
+              <span class="planet-dot" style="background:{{ f.color }}"></span>
+              <span style="color:{{ f.color }}" class="fw-bold">{{ f.symbol }} {{ f.planet }}</span>
+              {% if f.retrograde %}<span class="retro-badge ms-1">℞</span>{% endif %}
+            </td>
+            <td>
+              <div class="font-mono text-white small">{{ f.dms }}</div>
+              <div class="text-muted" style="font-size:0.72rem">{{ f.rashi }}</div>
+            </td>
+            <td>
+              <div class="nak-tag">{{ f.nakshatra }}</div>
+              <div class="text-muted mt-1" style="font-size:0.68rem">
+                Lord: <span style="color:{{ f.nak_lord_color }}">{{ f.nak_lord }}</span>
+              </div>
+              {% if f.nak_warning %}
+              <div class="warning-pill {{ f.nak_warning[0] }} mt-1" style="font-size:0.62rem">
+                ⚠ {{ f.nak_warning[0] | title }}
+              </div>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if f.natal_house %}
+              <span class="badge rounded-pill bg-dark border border-secondary text-white px-2">
+                H{{ f.natal_house }}
+              </span>
+              {% if f.conjoined_natal %}
+              <div class="mt-1" style="font-size:0.68rem;color:var(--text-muted)">
+                with {{ f.conjoined_natal | join(', ') }}
+              </div>
+              {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-muted small">{{ f.house_area }}</td>
+            <td style="max-width:240px;font-size:0.8rem">
+              {{ f.prediction or '—' }}
+            </td>
+            <td>
+              <span class="warning-pill {{ f.severity }}">
+                {% if f.severity == 'danger' %}⚠ Danger
+                {% elif f.severity == 'warning' %}⚡ Warning
+                {% elif f.severity == 'positive' %}✓ Positive
+                {% else %}· Neutral{% endif %}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ── ROW 6: Transit Aspects ────────────────────────────────────────────── #}
+{% if preds.aspects %}
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-diagram-2 me-2"></i>
+    Transit–Natal Aspects (Conjunctions &amp; Oppositions)
+  </div>
+  <div class="card-vedic-body">
+    <div class="row g-3">
+      {% for a in preds.aspects %}
+      <div class="col-md-6 col-lg-4">
+        <div class="pred-card {{ a.severity }}">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span style="color:{{ a.transit_color }}" class="fw-bold">{{ a.transit_planet }}</span>
+            <span class="text-muted small">{{ a.aspect }}</span>
+            <span style="color:{{ a.natal_color }}" class="fw-bold">{{ a.natal_planet }}</span>
+            <span class="ms-auto text-muted small">{{ a.orb }}°</span>
+          </div>
+          <div class="pred-text small">{{ a.message }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Panchang Summary ─────────────────────────────────────────────────── #}
+<div class="card-vedic mb-4">
+  <div class="card-vedic-header">
+    <i class="bi bi-calendar3 me-2"></i>Panchang for Today
+    <a href="{{ url_for('main.panchang') }}" class="btn btn-outline-gold btn-xs ms-auto">
+      Full Panchang →
+    </a>
+  </div>
+  <div class="card-vedic-body">
+    <div class="row g-2 text-center">
+      {% set panch = preds.panchang %}
+      <div class="col"><div class="panch-mini"><div class="pm-label">Vara</div>
+        <div class="pm-val">{{ panch.vara.name }}</div>
+        <div class="pm-sub">{{ panch.vara.lord }}</div></div></div>
+      <div class="col"><div class="panch-mini {{ 'auspicious' if panch.tithi.nature == 'Auspicious' else '' }}">
+        <div class="pm-label">Tithi</div>
+        <div class="pm-val">{{ panch.tithi.name }}</div>
+        <div class="pm-sub">{{ panch.tithi.paksha }}</div></div></div>
+      <div class="col"><div class="panch-mini">
+        <div class="pm-label">Nakshatra</div>
+        <div class="pm-val">{{ panch.nakshatra.name }}</div>
+        <div class="pm-sub">{{ panch.nakshatra.lord }}</div></div></div>
+      <div class="col"><div class="panch-mini {{ 'auspicious' if panch.yoga.nature == 'Auspicious' else 'inauspicious' }}">
+        <div class="pm-label">Yoga</div>
+        <div class="pm-val">{{ panch.yoga.name }}</div>
+        <div class="pm-sub">{{ panch.yoga.nature }}</div></div></div>
+      <div class="col"><div class="panch-mini {{ 'inauspicious' if panch.karana.is_vishti else '' }}">
+        <div class="pm-label">Karana</div>
+        <div class="pm-val">{{ panch.karana.name }}</div>
+        <div class="pm-sub">{{ panch.karana.nature[:10] }}</div></div></div>
+    </div>
+    <hr class="divider-gold my-3"/>
+    <div class="row g-3 text-center small">
+      <div class="col-6 col-md-3">
+        <div class="text-muted">Sunrise</div>
+        <div class="text-white fw-bold">{{ panch.sky.sunrise }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted">Moonrise</div>
+        <div class="text-moon fw-bold">{{ panch.sky.moonrise }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted">Rahu Kaal</div>
+        <div style="color:#8B5CF6" class="fw-bold">{{ panch.sky.rahu_kaal }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted">Abhijit Muhurta</div>
+        <div class="text-gold fw-bold">{{ panch.abhijit_muhurta }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

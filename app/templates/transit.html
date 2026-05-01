@@ -2,26 +2,63 @@
 {% block title %}Transit Chart — Jyotish Dashboard{% endblock %}
 
 {% block content %}
-<div class="page-header mb-4">
-  <h1 class="page-title"><i class="bi bi-stars me-2"></i>Transit Chart</h1>
-  <p class="page-sub">गोचर — Current planetary positions vs natal chart</p>
+<div class="page-header mb-4 d-flex justify-content-between align-items-start flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-stars me-2"></i>Transit Chart</h1>
+    <p class="page-sub">गोचर — Current planets mapped to natal houses with nakshatra warnings</p>
+  </div>
+  {% if transit %}
+  <div class="text-end">
+    <div class="native-detail text-gold">{{ transit.transit_time }}</div>
+    <div class="native-detail text-muted">Ayanamsa: {{ transit.ayanamsa }}°</div>
+    <a href="{{ url_for('main.predictions') }}" class="btn btn-vedic btn-sm mt-1">
+      <i class="bi bi-magic me-1"></i>Today's Predictions
+    </a>
+  </div>
+  {% endif %}
 </div>
 
 {% if transit %}
-<div class="row g-4">
-  <!-- Transit info bar -->
-  <div class="col-12">
-    <div class="transit-bar d-flex flex-wrap align-items-center gap-3 px-3 py-2">
-      <span><i class="bi bi-clock me-1 text-gold"></i>{{ transit.transit_time }}</span>
-      <span class="ms-auto text-muted small">Ayanamsa: {{ transit.ayanamsa }}°</span>
-    </div>
-  </div>
 
-  <!-- Transit chart canvas -->
-  <div class="col-xl-5">
+{# ── Warning summary bar ─────────────────────────────────────────────── #}
+{% if nak_house_map %}
+{% set danger_count  = nak_house_map | selectattr('warning_level','eq','danger')  | list | length %}
+{% set warning_count = nak_house_map | selectattr('warning_level','eq','warning') | list | length %}
+{% set positive_count= nak_house_map | selectattr('warning_level','eq','positive')| list | length %}
+<div class="transit-summary-bar mb-4">
+  <div class="tsb-item danger">
+    <i class="bi bi-exclamation-octagon-fill"></i>
+    <span class="tsb-num">{{ danger_count }}</span>
+    <span class="tsb-label">Danger</span>
+  </div>
+  <div class="tsb-item warning">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <span class="tsb-num">{{ warning_count }}</span>
+    <span class="tsb-label">Warning</span>
+  </div>
+  <div class="tsb-item positive">
+    <i class="bi bi-check-circle-fill"></i>
+    <span class="tsb-num">{{ positive_count }}</span>
+    <span class="tsb-label">Positive</span>
+  </div>
+  <div class="tsb-divider"></div>
+  <div class="tsb-hint text-muted small">
+    {% if not natal %}
+    <i class="bi bi-info-circle me-1"></i>Generate a Kundli for natal house mapping
+    {% else %}
+    Planets mapped to your natal houses
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+  {# ── Left: Chart canvas ────────────────────────────────────────────── #}
+  <div class="col-xl-4">
     <div class="card-vedic mb-4">
       <div class="card-vedic-header">
-        <i class="bi bi-grid-3x3 me-2"></i>Transit Positions Now
+        <i class="bi bi-grid-3x3 me-2"></i>Transit Chart Now
       </div>
       <div class="card-vedic-body p-2">
         <canvas id="transitCanvas" width="440" height="440"
@@ -29,15 +66,163 @@
                 data-chart="{{ transit | tojson | e }}"></canvas>
       </div>
     </div>
-  </div>
 
-  <!-- Planet comparison table -->
-  <div class="col-xl-7">
+    {# Sky now #}
     <div class="card-vedic">
       <div class="card-vedic-header">
-        <i class="bi bi-table me-2"></i>Transit vs Natal Comparison
+        <i class="bi bi-sunrise-fill me-2"></i>Sky Right Now
+      </div>
+      <div class="card-vedic-body">
+        <div class="sky-grid">
+          <div class="sky-item"><i class="bi bi-sunrise text-sunrise"></i>
+            <div class="sky-label">Sunrise</div><div class="sky-value" id="t-sunrise">—</div></div>
+          <div class="sky-item"><i class="bi bi-sunset text-sunset"></i>
+            <div class="sky-label">Sunset</div><div class="sky-value" id="t-sunset">—</div></div>
+          <div class="sky-item"><i class="bi bi-moon-stars text-moon"></i>
+            <div class="sky-label">Moonrise</div><div class="sky-value" id="t-moonrise">—</div></div>
+          <div class="sky-item"><i class="bi bi-moon text-moon"></i>
+            <div class="sky-label">Moonset</div><div class="sky-value" id="t-moonset">—</div></div>
+          <div class="sky-item"><i class="bi bi-brightness-high text-gold"></i>
+            <div class="sky-label">Solar Noon</div><div class="sky-value" id="t-noon">—</div></div>
+          <div class="sky-item"><i class="bi bi-hourglass-split text-rahu"></i>
+            <div class="sky-label">Day Length</div><div class="sky-value" id="t-daylength">—</div></div>
+        </div>
+        <hr class="divider-gold my-3"/>
+        <div class="row g-2 text-center">
+          <div class="col-4"><div class="kaal-box rahu">
+            <div class="kaal-label">Rahu Kaal</div>
+            <div class="kaal-time" id="t-rahu">—</div></div></div>
+          <div class="col-4"><div class="kaal-box gulika">
+            <div class="kaal-label">Gulika Kaal</div>
+            <div class="kaal-time" id="t-gulika">—</div></div></div>
+          <div class="col-4"><div class="kaal-box yama">
+            <div class="kaal-label">Yamaghanta</div>
+            <div class="kaal-time" id="t-yama">—</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Right: Nakshatra-House Map + comparison ───────────────────────── #}
+  <div class="col-xl-8">
+
+    {# Nakshatra-House Warning Map #}
+    {% if nak_house_map %}
+    <div class="card-vedic mb-4">
+      <div class="card-vedic-header">
+        <i class="bi bi-map me-2"></i>
+        Nakshatra → House Warning Map
         {% if not natal %}
-        <span class="badge bg-warning text-dark ms-2">Generate Kundli for natal comparison</span>
+        <span class="badge bg-warning text-dark ms-2">No natal chart — generate Kundli</span>
+        {% endif %}
+      </div>
+      <div class="card-vedic-body p-0">
+        <div class="table-responsive">
+          <table class="table table-vedic mb-0">
+            <thead>
+              <tr>
+                <th>Planet</th>
+                <th>Position</th>
+                <th>Nakshatra</th>
+                <th>Pada</th>
+                <th>Nak Lord</th>
+                <th>Natal House</th>
+                <th>Natal Occupants</th>
+                <th>Warning</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in nak_house_map %}
+              <tr class="nak-house-row
+                {% if row.warning_level == 'danger' %}transit-row-danger
+                {% elif row.warning_level == 'warning' %}transit-row-warning
+                {% elif row.warning_level == 'positive' %}transit-row-positive{% endif %}">
+
+                <td>
+                  <span class="planet-dot" style="background:{{ row.color }}"></span>
+                  <span style="color:{{ row.color }}" class="fw-bold">
+                    {{ row.symbol }} {{ row.planet }}
+                  </span>
+                  {% if row.retrograde %}<span class="retro-badge ms-1">℞</span>{% endif %}
+                </td>
+
+                <td>
+                  <div class="font-mono text-white small">{{ row.dms }}</div>
+                  <div class="text-muted" style="font-size:0.7rem">{{ row.rashi }}</div>
+                </td>
+
+                <td>
+                  <div class="nak-tag">{{ row.nakshatra }}</div>
+                  <div class="text-muted mt-1" style="font-size:0.7rem;max-width:160px">
+                    {{ row.nak_meaning[:60] }}{% if row.nak_meaning|length > 60 %}…{% endif %}
+                  </div>
+                </td>
+
+                <td class="text-center text-gold fw-bold">{{ row.nak_pada }}</td>
+
+                <td>
+                  <span class="warning-pill neutral" style="font-size:0.68rem">
+                    {{ row.nak_lord }}
+                  </span>
+                </td>
+
+                <td class="text-center">
+                  {% if row.natal_house %}
+                  <span class="badge rounded-pill px-2 py-1
+                    {% if row.warning_level == 'danger' %}bg-danger
+                    {% elif row.warning_level == 'warning' %}bg-warning text-dark
+                    {% elif row.warning_level == 'positive' %}bg-success
+                    {% else %}bg-secondary{% endif %}">
+                    H{{ row.natal_house }}
+                  </span>
+                  {% else %}
+                  <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% if row.natal_occupants %}
+                    {% for op in row.natal_occupants %}
+                    <span class="planet-chip text-warning">{{ op[:3] }}</span>
+                    {% endfor %}
+                  {% else %}
+                  <span class="text-muted small">Empty</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% if row.nak_warning %}
+                  <div>
+                    <span class="warning-pill {{ row.nak_warning[0] }}">
+                      ⚠ {{ row.nak_warning[0] | title }}
+                    </span>
+                    <div class="text-muted mt-1" style="font-size:0.68rem;max-width:140px">
+                      {{ row.nak_warning[1] }}
+                    </div>
+                  </div>
+                  {% else %}
+                  <span class="warning-pill {{ row.warning_level }}">
+                    {% if row.warning_level == 'positive' %}✓ Positive
+                    {% elif row.warning_level == 'warning' %}⚡ Watch
+                    {% else %}· Neutral{% endif %}
+                  </span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Transit vs Natal comparison table #}
+    <div class="card-vedic">
+      <div class="card-vedic-header">
+        <i class="bi bi-table me-2"></i>Transit vs Natal Positions
+        {% if not natal %}
+        <span class="badge bg-warning text-dark ms-2">Generate Kundli for comparison</span>
         {% endif %}
       </div>
       <div class="card-vedic-body p-0">
@@ -48,8 +233,12 @@
                 <th>Planet</th>
                 <th>Transit Rashi</th>
                 <th>Transit °</th>
-                <th>Transit House</th>
-                {% if natal %}<th>Natal Rashi</th><th>Natal House</th>{% endif %}
+                <th>Transit H</th>
+                {% if natal %}
+                <th>Natal Rashi</th>
+                <th>Natal H</th>
+                <th>Moved?</th>
+                {% endif %}
                 <th>R</th>
               </tr>
             </thead>
@@ -65,15 +254,21 @@
                 <td class="text-center">{{ p.house }}</td>
                 {% if natal and pname in natal.planets %}
                   {% set np = natal.planets[pname] %}
-                  <td {% if np.rashi != p.rashi %}class="text-warning"{% endif %}>
+                  <td {% if np.rashi != p.rashi %}style="color:#FFD700"{% endif %}>
                     {{ np.rashi_name }}
                   </td>
-                  <td class="text-center
-                    {% if np.house != p.house %}text-warning{% endif %}">
+                  <td class="text-center {% if np.house != p.house %}text-warning{% endif %}">
                     {{ np.house }}
                   </td>
+                  <td class="text-center">
+                    {% if np.rashi != p.rashi %}
+                    <span class="warning-pill caution" style="font-size:0.65rem">Changed</span>
+                    {% else %}
+                    <span class="text-muted small">Same</span>
+                    {% endif %}
+                  </td>
                 {% elif natal %}
-                  <td>—</td><td>—</td>
+                  <td>—</td><td>—</td><td>—</td>
                 {% endif %}
                 <td class="text-center">
                   {% if p.retrograde %}<span class="retro-badge">℞</span>{% endif %}
@@ -86,75 +281,8 @@
       </div>
     </div>
 
-    <!-- Sky now -->
-    <div class="card-vedic mt-4">
-      <div class="card-vedic-header">
-        <i class="bi bi-sunrise-fill me-2"></i>Sky Right Now
-      </div>
-      <div class="card-vedic-body">
-        <div class="sky-grid">
-          <div class="sky-item">
-            <i class="bi bi-sunrise text-sunrise"></i>
-            <div class="sky-label">Sunrise</div>
-            <div class="sky-value" id="t-sunrise">—</div>
-          </div>
-          <div class="sky-item">
-            <i class="bi bi-sunset text-sunset"></i>
-            <div class="sky-label">Sunset</div>
-            <div class="sky-value" id="t-sunset">—</div>
-          </div>
-          <div class="sky-item">
-            <i class="bi bi-moon-stars text-moon"></i>
-            <div class="sky-label">Moonrise</div>
-            <div class="sky-value" id="t-moonrise">—</div>
-          </div>
-          <div class="sky-item">
-            <i class="bi bi-moon text-moon"></i>
-            <div class="sky-label">Moonset</div>
-            <div class="sky-value" id="t-moonset">—</div>
-          </div>
-          <div class="sky-item">
-            <i class="bi bi-brightness-high text-gold"></i>
-            <div class="sky-label">Solar Noon</div>
-            <div class="sky-value" id="t-noon">—</div>
-          </div>
-          <div class="sky-item">
-            <i class="bi bi-hourglass-split text-rahu"></i>
-            <div class="sky-label">Day Length</div>
-            <div class="sky-value" id="t-daylength">—</div>
-          </div>
-        </div>
-        <hr class="divider-gold my-3"/>
-        <div class="row g-2 text-center">
-          <div class="col-4">
-            <div class="kaal-box rahu">
-              <div class="kaal-label">Rahu Kaal</div>
-              <div class="kaal-time" id="t-rahu">—</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="kaal-box gulika">
-              <div class="kaal-label">Gulika Kaal</div>
-              <div class="kaal-time" id="t-gulika">—</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="kaal-box yama">
-              <div class="kaal-label">Yamaghanta</div>
-              <div class="kaal-time" id="t-yama">—</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{% else %}
-<div class="card-vedic text-center py-5">
-  <i class="bi bi-stars fs-1 text-gold mb-3"></i>
-  <h4 class="text-gold">Loading transit data…</h4>
-  <p class="text-muted">Fetching current planetary positions.</p>
-</div>
+  </div>{# /col-xl-8 #}
+</div>{# /row #}
 {% endif %}
 {% endblock %}
 
@@ -166,7 +294,6 @@ const transitData = {{ transit | tojson }};
 renderNorthIndianChart("transitCanvas", transitData.house_occupants,
                         transitData.lagna.rashi, transitData.planets);
 
-// Sky for today
 (function() {
   const lat = {{ transit.latitude }};
   const lon = {{ transit.longitude_coord }};
@@ -183,7 +310,6 @@ renderNorthIndianChart("transitCanvas", transitData.house_occupants,
     }).catch(() => {});
 })();
 
-// Auto-refresh transit every 5 minutes
 setInterval(() => window.location.reload(), 300000);
 {% endif %}
 </script>
