@@ -45,3 +45,5 @@ logs/
 
 # Docker
 .docker/
+data/*.json
+data/charts.json
