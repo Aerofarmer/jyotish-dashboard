@@ -4,7 +4,8 @@ import calendar as cal_mod
 import pytz
 import traceback
 
-from .astrology.calculator import calculate_full_chart, calculate_transit_chart, get_sunrise_sunset_moonrise
+from .astrology.calculator import (calculate_full_chart, calculate_transit_chart,
+                                    get_sunrise_sunset_moonrise, PLANET_COLORS)
 from .astrology.dasha import calculate_vimshottari, dasha_summary
 from .astrology.panchang import calculate_panchang
 from .astrology.store import save_chart, list_charts, get_chart, delete_chart
@@ -333,6 +334,93 @@ def _quick_day_score(pan: dict, d: date) -> dict:
         "nakshatra": pan.get("nakshatra", {}).get("name", ""),
         "vara":      vara_lord,
     }
+
+
+# ─────────────────────────────────────────────
+#  API: Deep day detail for calendar panel
+# ─────────────────────────────────────────────
+@main.route("/api/day-detail")
+def day_detail():
+    date_str = request.args.get("date", date.today().isoformat())
+    lat      = float(request.args.get("lat",  session.get("birth_lat", 28.6139)))
+    lon      = float(request.args.get("lon",  session.get("birth_lon", 77.2090)))
+    tz_str   = request.args.get("tz", session.get("birth_tz", "Asia/Kolkata"))
+
+    try:
+        d    = datetime.strptime(date_str, "%Y-%m-%d").date()
+        pan  = calculate_panchang(d, lat, lon, tz_str, None)
+        sky  = get_sunrise_sunset_moonrise(d, lat, lon, tz_str)
+        q    = _quick_day_score(pan, d)
+
+        # Per-element quality for breakdown display
+        tithi_num  = pan.get("tithi", {}).get("number", 5)
+        yoga_name  = pan.get("yoga",  {}).get("name", "")
+        vara_lord  = pan.get("vara",  {}).get("lord", "")
+        nak_name   = pan.get("nakshatra", {}).get("name", "")
+
+        _vara_scores  = {"Sun":7,"Moon":8,"Mars":4,"Mercury":7,"Jupiter":9,"Venus":8,"Saturn":3}
+        _good_tithis  = {1,2,3,5,7,10,11,13,15}
+        _bad_tithis   = {4,6,8,9,12,14,30}
+        _good_yogas   = {"Siddhi","Amriti","Shubha","Labha","Sukla","Brahma","Indra","Siddha",
+                         "Sadhya","Priti","Ayushman","Saubhagya","Shobhana","Sukarma",
+                         "Dhriti","Vriddhi","Dhruva","Harshana","Variyan","Shiva"}
+        _bad_yogas    = {"Vyatipata","Ganda","Shoola","Atiganda","Vajra","Vyaghata",
+                         "Vishkamba","Parigha","Vaidhriti"}
+
+        vara_q  = "positive" if _vara_scores.get(vara_lord, 5) >= 7 else (
+                  "negative" if _vara_scores.get(vara_lord, 5) <= 4 else "neutral")
+        tithi_q = "positive" if tithi_num in _good_tithis else (
+                  "negative" if tithi_num in _bad_tithis   else "neutral")
+        yoga_q  = "positive" if yoga_name in _good_yogas else (
+                  "negative" if yoga_name in _bad_yogas    else "neutral")
+
+        # Nakshatra nature from panchang result
+        nak_nature = pan.get("nakshatra", {}).get("nature", "Mixed")
+        nak_q = "positive" if nak_nature == "Auspicious" else (
+                "negative" if nak_nature == "Inauspicious" else "neutral")
+
+        breakdown = [
+            {"limb":"Vara",      "name":pan.get("vara",{}).get("name",""),
+             "detail":f"Lord: {vara_lord}", "quality": vara_q},
+            {"limb":"Tithi",     "name":pan.get("tithi",{}).get("name",""),
+             "detail":pan.get("tithi",{}).get("paksha",""), "quality": tithi_q},
+            {"limb":"Nakshatra", "name":nak_name,
+             "detail":f"Lord: {pan.get('nakshatra',{}).get('lord','')}", "quality": nak_q},
+            {"limb":"Yoga",      "name":yoga_name,
+             "detail":pan.get("yoga",{}).get("nature",""), "quality": yoga_q},
+            {"limb":"Karana",    "name":pan.get("karana",{}).get("name",""),
+             "detail":pan.get("karana",{}).get("nature",""), "quality":"neutral"},
+        ]
+
+        # Inauspicious windows from sky data
+        inauspicious = [
+            {"name":"Rahu Kaal",   "time": sky.get("rahu_kaal","—"),   "color":"#7c3aed"},
+            {"name":"Gulika Kaal", "time": sky.get("gulika_kaal","—"), "color":"#6b7280"},
+            {"name":"Yamaghanta",  "time": sky.get("yamaghanta","—"),  "color":"#ef4444"},
+        ]
+
+        return jsonify({
+            "date":         date_str,
+            "weekday":      d.strftime("%A"),
+            "score":        q,
+            "panchang":     pan,
+            "breakdown":    breakdown,
+            "sunrise":      sky.get("sunrise","—"),
+            "sunset":       sky.get("sunset","—"),
+            "moonrise":     sky.get("moonrise","—"),
+            "moonset":      sky.get("moonset","—"),
+            "solar_noon":   sky.get("solar_noon","—"),
+            "day_length":   sky.get("day_length","—"),
+            "moon_phase":   sky.get("moon_phase_name","—"),
+            "moon_phase_pct": sky.get("moon_phase_pct", 0),
+            "abhijit":      pan.get("abhijit_muhurta","—"),
+            "tarabala":     pan.get("tarabala",{}),
+            "chandra_bala": pan.get("chandra_bala",{}),
+            "inauspicious": inauspicious,
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # ─────────────────────────────────────────────

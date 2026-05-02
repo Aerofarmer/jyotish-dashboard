@@ -58,6 +58,7 @@
     <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#ea580c"></span>Caution</span>
     <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#dc2626"></span>Difficult</span>
   </div>
+  <div id="day-detail-panel"></div>
 </div>
 
 {% if error %}
@@ -578,13 +579,13 @@ function gotoDate(val) {
 }
 
 // ── Calendar state ──────────────────────────────────────────────
-const TODAY_STR   = "{{ today }}";
-const SEL_STR     = "{{ selected_date }}";
-const LAT         = {{ session.get('birth_lat', 28.6139) }};
-const LON         = {{ session.get('birth_lon', 77.2090) }};
-const TZ          = "{{ session.get('birth_tz', 'Asia/Kolkata') }}";
+const TODAY_STR = "{{ today }}";
+const SEL_STR   = "{{ selected_date }}";
+const LAT = {{ session.get('birth_lat', 28.6139) }};
+const LON = {{ session.get('birth_lon', 77.2090) }};
+const TZ  = "{{ session.get('birth_tz', 'Asia/Kolkata') }}";
 
-let calYear, calMonth;
+let calYear, calMonth, activeDetailDate = null;
 
 (function init() {
   const d = new Date(SEL_STR + "T12:00:00");
@@ -594,9 +595,12 @@ let calYear, calMonth;
 
 const MONTH_NAMES = ["January","February","March","April","May","June",
                      "July","August","September","October","November","December"];
+const MOON_EMOJIS = pct =>
+  pct<5?"🌑":pct<25?"🌒":pct<45?"🌓":pct<55?"🌔":pct<75?"🌕":pct<85?"🌖":pct<95?"🌗":"🌘";
 
-let scoreCache = {};
+let scoreCache = {}, detailCache = {};
 
+// ── Toggle month-view calendar ──────────────────────────────────
 function toggleCalendar() {
   const cal = document.getElementById("pred-calendar");
   const btn = document.getElementById("cal-toggle-btn");
@@ -607,90 +611,220 @@ function toggleCalendar() {
   } else {
     cal.style.display = "none";
     btn.innerHTML = '<i class="bi bi-calendar-week me-1"></i>Month View';
+    clearDetailPanel();
   }
 }
 
+// ── Load month scores ───────────────────────────────────────────
 function loadMonth(year, month) {
   const key = `${year}-${month}`;
-  document.getElementById("cal-month-title").textContent =
-    MONTH_NAMES[month-1] + " " + year;
+  document.getElementById("cal-month-title").textContent = MONTH_NAMES[month-1] + " " + year;
+  clearDetailPanel();
 
-  if (scoreCache[key]) {
-    renderCalendar(year, month, scoreCache[key]);
-    return;
-  }
+  if (scoreCache[key]) { renderCalendar(year, month, scoreCache[key]); return; }
 
   document.getElementById("cal-grid").innerHTML =
-    '<div class="cal-loading"><i class="bi bi-arrow-repeat"></i> Loading…</div>';
+    '<div class="cal-loading"><i class="bi bi-arrow-repeat"></i> Loading panchang…</div>';
 
   fetch(`/api/month-scores?year=${year}&month=${month}&lat=${LAT}&lon=${LON}&tz=${encodeURIComponent(TZ)}`)
-    .then(r => r.json())
-    .then(data => {
-      scoreCache[key] = data;
-      renderCalendar(year, month, data);
-    })
+    .then(r => r.json()).then(data => { scoreCache[key] = data; renderCalendar(year, month, data); })
     .catch(() => {
       document.getElementById("cal-grid").innerHTML =
-        '<div class="cal-loading text-danger">Could not load panchang data.</div>';
+        '<div class="cal-loading" style="color:#dc2626">Could not load data.</div>';
     });
 }
 
+// ── Render calendar grid ────────────────────────────────────────
 function renderCalendar(year, month, scores) {
   const grid      = document.getElementById("cal-grid");
-  const firstDay  = new Date(year, month - 1, 1).getDay();  // 0=Sun
+  const firstDay  = new Date(year, month - 1, 1).getDay();
   const daysInMon = new Date(year, month, 0).getDate();
   const todayD    = new Date(TODAY_STR + "T12:00:00");
-  const selD      = new Date(SEL_STR   + "T12:00:00");
 
   let html = "";
-
-  // Empty leading cells
-  for (let i = 0; i < firstDay; i++) {
-    html += '<div class="cal-day empty"></div>';
-  }
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
 
   for (let day = 1; day <= daysInMon; day++) {
     const d      = new Date(year, month - 1, day);
     const iso    = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    const isToday = d.toDateString() === todayD.toDateString();
-    const isSel   = d.toDateString() === selD.toDateString();
-    const score   = scores[String(day)] || {color:"#9ca3af", label:"—", score:5};
-    const future  = d > todayD;
+    const isToday  = d.toDateString() === todayD.toDateString();
+    const isActive = iso === activeDetailDate;
+    const score    = scores[String(day)] || {color:"#9ca3af", label:"—", score:5};
+    const future   = d > todayD;
 
     let cls = "cal-day";
     if (isToday)  cls += " today";
-    if (isSel)    cls += " selected";
+    if (isActive) cls += " active-detail";
     if (future)   cls += " future";
 
-    const href  = future ? "#" : `/predictions?date=${iso}`;
-    const click = future ? `onclick="return false;"` : "";
+    const clickHandler = future ? "return false" : `selectDay('${iso}',event)`;
 
-    const tooltip = `${score.label} (${score.score}/10)` +
-                    (score.tithi ? ` · ${score.tithi}` : "") +
-                    (score.vara  ? ` · ${score.vara}` : "");
-
-    html += `<a href="${href}" class="${cls}" title="${tooltip}" ${click}>
-               <div class="cal-d-num">${day}</div>
-               ${!isSel ? `<div class="cal-d-dot" style="background:${score.color}"></div>` : ""}
-               <div class="cal-d-label" style="color:${score.color}">${score.label}</div>
-             </a>`;
+    html += `<div class="${cls}" onclick="${clickHandler}" title="${score.label} · ${score.tithi||''} · ${score.vara||''}">
+      <div class="cal-d-num">${day}</div>
+      <div class="cal-d-dot" style="background:${score.color}"></div>
+      <div class="cal-d-label" style="color:${score.color}">${score.label}</div>
+    </div>`;
   }
-
   grid.innerHTML = html;
 }
 
+// ── Select a day → load detail panel ───────────────────────────
+function selectDay(iso, e) {
+  if (e) e.preventDefault();
+
+  // Toggle off if same day clicked again
+  if (activeDetailDate === iso) {
+    activeDetailDate = null;
+    clearDetailPanel();
+    renderCalendar(calYear, calMonth, scoreCache[`${calYear}-${calMonth}`] || {});
+    return;
+  }
+
+  activeDetailDate = iso;
+  // Re-render grid to mark active cell
+  if (scoreCache[`${calYear}-${calMonth}`])
+    renderCalendar(calYear, calMonth, scoreCache[`${calYear}-${calMonth}`]);
+
+  const panel = document.getElementById("day-detail-panel");
+  panel.innerHTML = '<div class="cal-loading"><i class="bi bi-arrow-repeat"></i> Loading day detail…</div>';
+  panel.scrollIntoView({behavior:"smooth", block:"nearest"});
+
+  if (detailCache[iso]) { renderDetailPanel(detailCache[iso]); return; }
+
+  fetch(`/api/day-detail?date=${iso}&lat=${LAT}&lon=${LON}&tz=${encodeURIComponent(TZ)}`)
+    .then(r => r.json()).then(data => {
+      if (data.error) throw new Error(data.error);
+      detailCache[iso] = data;
+      renderDetailPanel(data);
+    })
+    .catch(err => {
+      document.getElementById("day-detail-panel").innerHTML =
+        `<div class="cal-loading" style="color:#dc2626">Error: ${err.message}</div>`;
+    });
+}
+
+function clearDetailPanel() {
+  document.getElementById("day-detail-panel").innerHTML = "";
+  activeDetailDate = null;
+}
+
+// ── Render the full day detail panel ───────────────────────────
+function renderDetailPanel(d) {
+  const sc = d.score;
+  const pct = d.moon_phase_pct || 0;
+
+  const qClass = {positive:"ddp-q-positive", neutral:"ddp-q-neutral", negative:"ddp-q-negative"};
+  const qLabel = {positive:"Good", neutral:"Neutral", negative:"Caution"};
+
+  const limbs = (d.breakdown || []).map(b => `
+    <div class="ddp-limb">
+      <span class="ddp-limb-tag">${b.limb}</span>
+      <span class="ddp-limb-name">${b.name}</span>
+      <span class="ddp-limb-detail">${b.detail}</span>
+      <span class="ddp-limb-q ${qClass[b.quality]||'ddp-q-neutral'}">${qLabel[b.quality]||'—'}</span>
+    </div>`).join("");
+
+  const sky = `
+    <div class="ddp-section-title"><i class="bi bi-sunrise me-1"></i>Sky</div>
+    <div class="ddp-sky-grid">
+      <div class="ddp-sky-item"><div class="ddp-sky-label">Sunrise</div><div class="ddp-sky-val">${d.sunrise||'—'}</div></div>
+      <div class="ddp-sky-item"><div class="ddp-sky-label">Sunset</div><div class="ddp-sky-val">${d.sunset||'—'}</div></div>
+      <div class="ddp-sky-item"><div class="ddp-sky-label">Solar Noon</div><div class="ddp-sky-val">${d.solar_noon||'—'}</div></div>
+      <div class="ddp-sky-item"><div class="ddp-sky-label">Moonrise</div><div class="ddp-sky-val">${d.moonrise||'—'}</div></div>
+      <div class="ddp-sky-item"><div class="ddp-sky-label">Moonset</div><div class="ddp-sky-val">${d.moonset||'—'}</div></div>
+      <div class="ddp-sky-item"><div class="ddp-sky-label">Day Length</div><div class="ddp-sky-val">${d.day_length||'—'}</div></div>
+    </div>`;
+
+  const kaals = (d.inauspicious || []).map(k => `
+    <div class="ddp-kaal" style="border-color:${k.color};background:${k.color}18">
+      <div class="ddp-kaal-name">${k.name}</div>
+      <div class="ddp-kaal-time" style="color:${k.color}">${k.time}</div>
+    </div>`).join("");
+
+  const tarabala = d.tarabala || {};
+  const cbala    = d.chandra_bala || {};
+  const balaColor = v => v === "Favorable" ? "#15803d" : v === "Unfavorable" ? "#dc2626" : "#6b7280";
+  const balaStyle = v => `background:${balaColor(v)}18;border-color:${balaColor(v)};color:${balaColor(v)}`;
+
+  const bala = `
+    <div class="ddp-section-title"><i class="bi bi-stars me-1"></i>Bala (Strength)</div>
+    <div class="ddp-bala-row">
+      <div class="ddp-bala-pill" style="${balaStyle(tarabala.quality||'')}">
+        <i class="bi bi-star-fill"></i>Tarabala: ${tarabala.name||'—'} — ${tarabala.quality||'—'}
+      </div>
+      <div class="ddp-bala-pill" style="${balaStyle(cbala.quality||'')}">
+        <i class="bi bi-moon-fill"></i>Chandra Bala: ${cbala.quality||'—'}
+      </div>
+    </div>`;
+
+  const isToday = d.date === TODAY_STR;
+  const isFuture = new Date(d.date+"T12:00:00") > new Date(TODAY_STR+"T12:00:00");
+
+  const cta = `
+    <div class="ddp-cta">
+      ${!isFuture ? `<a href="/predictions?date=${d.date}" class="btn btn-vedic btn-xs flex-grow-1">
+        <i class="bi bi-magic me-1"></i>${isToday ? "Today's Full Predictions" : "Predictions for this Day"} →
+      </a>` : `<span class="text-muted small"><i class="bi bi-lock me-1"></i>Future date — predictions unavailable</span>`}
+      <button class="btn btn-outline-gold btn-xs" onclick="clearDetailPanel();renderCalendar(calYear,calMonth,scoreCache[calYear+'-'+calMonth]||{})">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>`;
+
+  document.getElementById("day-detail-panel").innerHTML = `
+  <div class="day-detail-panel">
+    <div class="ddp-header">
+      <div>
+        <span class="ddp-date">${new Date(d.date+"T12:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</span>
+        <span class="ddp-weekday">${d.weekday}</span>
+      </div>
+      <div class="ddp-score-badge" style="border-color:${sc.color};color:${sc.color}">
+        <span class="ddp-score-num">${sc.score}</span>
+        <span>/10 &nbsp; ${sc.label}</span>
+      </div>
+    </div>
+    <div class="ddp-body">
+      <div class="d-flex gap-3 align-items-start">
+        <div class="ddp-score-ring" style="border-color:${sc.color};color:${sc.color}">
+          <div class="ddp-ring-num">${sc.score}</div>
+          <div class="ddp-ring-label">${sc.label}</div>
+        </div>
+        <div class="ddp-limbs">${limbs}</div>
+      </div>
+
+      <div class="ddp-moon-bar mt-3">
+        <div class="ddp-moon-icon">${MOON_EMOJIS(pct)}</div>
+        <div class="ddp-moon-info">
+          <div class="ddp-moon-phase">${d.moon_phase||'—'} &nbsp;<span style="color:var(--text-muted);font-size:0.78rem;font-weight:400">${pct}%</span></div>
+          <div class="ddp-moon-bar-track"><div class="ddp-moon-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+      </div>
+
+      ${sky}
+
+      <div class="ddp-section-title"><i class="bi bi-hourglass-split me-1"></i>Inauspicious Periods</div>
+      <div class="ddp-inauspicious">${kaals}</div>
+
+      <div class="ddp-muhurta">
+        <span class="ddp-muhurta-label"><i class="bi bi-sun me-1"></i>Abhijit Muhurta</span>
+        <span class="ddp-muhurta-val">${d.abhijit||'—'}</span>
+      </div>
+
+      ${bala}
+      ${cta}
+    </div>
+  </div>`;
+}
+
+// ── Month navigation ────────────────────────────────────────────
 document.getElementById("cal-prev").addEventListener("click", () => {
-  calMonth--;
-  if (calMonth < 1) { calMonth = 12; calYear--; }
+  calMonth--; if (calMonth < 1) { calMonth = 12; calYear--; }
   loadMonth(calYear, calMonth);
 });
-
 document.getElementById("cal-next").addEventListener("click", () => {
   const now = new Date(TODAY_STR + "T12:00:00");
   if (calYear > now.getFullYear() ||
-      (calYear === now.getFullYear() && calMonth >= now.getMonth() + 1)) return;
-  calMonth++;
-  if (calMonth > 12) { calMonth = 1; calYear++; }
+     (calYear === now.getFullYear() && calMonth >= now.getMonth() + 1)) return;
+  calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; }
   loadMonth(calYear, calMonth);
 });
 </script>
