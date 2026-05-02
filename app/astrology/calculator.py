@@ -285,11 +285,16 @@ def calculate_full_chart(
     }
 
 
-def calculate_transit_chart(lat: float, lon: float, tz_str: str) -> dict:
-    """Current planetary positions (transit) for a given location."""
-    now = datetime.now(pytz.timezone(tz_str))
-    chart = calculate_full_chart(now, lat, lon, tz_str, name="Transit")
-    chart["transit_time"] = now.strftime("%d %b %Y, %I:%M %p %Z")
+def calculate_transit_chart(lat: float, lon: float, tz_str: str,
+                            dt: datetime = None) -> dict:
+    """Planetary positions for a given datetime (defaults to now)."""
+    tz = pytz.timezone(tz_str)
+    if dt is None:
+        dt = datetime.now(tz)
+    elif dt.tzinfo is None:
+        dt = tz.localize(dt)
+    chart = calculate_full_chart(dt, lat, lon, tz_str, name="Transit")
+    chart["transit_time"] = dt.strftime("%d %b %Y, %I:%M %p %Z")
     return chart
 
 

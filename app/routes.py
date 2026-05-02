@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 from datetime import datetime, date
+import calendar as cal_mod
 import pytz
 import traceback
 
@@ -213,28 +214,125 @@ def predictions():
     name  = session.get("birth_name", "Native")
     place = session.get("birth_place", "")
 
+    # Optional date override (for calendar navigation)
+    date_str      = request.args.get("date", "")
+    today         = date.today()
+    selected_date = today
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
     preds  = None
     error  = None
 
     if not (dob and tob):
-        error = "Please generate a Kundli first to see today's predictions."
-        return render_template("predictions.html", preds=None, error=error)
+        error = "Please generate a Kundli first to see predictions."
+        return render_template("predictions.html", preds=None, error=error,
+                               selected_date=selected_date.isoformat(),
+                               today=today.isoformat())
 
     try:
-        birth_dt      = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
-        natal_chart   = calculate_full_chart(birth_dt, float(lat), float(lon),
-                                             tz, name=name, place=place)
-        transit_data  = calculate_transit_chart(float(lat), float(lon), tz)
-        moon_lon      = natal_chart["planets"]["Moon"]["longitude"]
-        dasha_data    = calculate_vimshottari(moon_lon, birth_dt)
-        preds         = generate_predictions(natal_chart, transit_data,
-                                             dasha_data, float(lat), float(lon), tz)
+        birth_dt    = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
+        natal_chart = calculate_full_chart(birth_dt, float(lat), float(lon),
+                                           tz, name=name, place=place)
+
+        if selected_date == today:
+            transit_data = calculate_transit_chart(float(lat), float(lon), tz)
+        else:
+            tz_obj      = pytz.timezone(tz)
+            transit_dt  = tz_obj.localize(datetime(selected_date.year,
+                                                    selected_date.month,
+                                                    selected_date.day, 12, 0))
+            transit_data = calculate_transit_chart(float(lat), float(lon), tz, dt=transit_dt)
+
+        moon_lon   = natal_chart["planets"]["Moon"]["longitude"]
+        dasha_data = calculate_vimshottari(moon_lon, birth_dt)
+        preds      = generate_predictions(natal_chart, transit_data,
+                                          dasha_data, float(lat), float(lon), tz)
     except Exception as e:
         error = str(e)
         traceback.print_exc()
 
     return render_template("predictions.html", preds=preds, error=error,
-                           name=name, place=place)
+                           name=name, place=place,
+                           selected_date=selected_date.isoformat(),
+                           today=today.isoformat())
+
+
+# ─────────────────────────────────────────────
+#  API: Month day-quality scores for calendar
+# ─────────────────────────────────────────────
+@main.route("/api/month-scores")
+def month_scores():
+    year   = int(request.args.get("year",  date.today().year))
+    month  = int(request.args.get("month", date.today().month))
+    lat    = float(request.args.get("lat",  session.get("birth_lat", 28.6139)))
+    lon    = float(request.args.get("lon",  session.get("birth_lon", 77.2090)))
+    tz_str = request.args.get("tz", session.get("birth_tz", "Asia/Kolkata"))
+
+    num_days = cal_mod.monthrange(year, month)[1]
+    scores   = {}
+
+    for day in range(1, num_days + 1):
+        d = date(year, month, day)
+        try:
+            pan        = calculate_panchang(d, lat, lon, tz_str, None)
+            scores[day] = _quick_day_score(pan, d)
+        except Exception:
+            scores[day] = {"score": 5, "color": "#9ca3af", "label": "Neutral",
+                           "tithi": "", "nakshatra": "", "vara": ""}
+
+    return jsonify(scores)
+
+
+def _quick_day_score(pan: dict, d: date) -> dict:
+    score = 5
+    vara_scores = {
+        "Sun": 7, "Moon": 8, "Mars": 4, "Mercury": 7,
+        "Jupiter": 9, "Venus": 8, "Saturn": 3,
+    }
+    vara_lord = pan.get("vara", {}).get("lord", "")
+    score += vara_scores.get(vara_lord, 0) - 5
+
+    tithi_num = pan.get("tithi", {}).get("number", 5)
+    good_tithis = {1, 2, 3, 5, 7, 10, 11, 13, 15}
+    bad_tithis  = {4, 6, 8, 9, 12, 14, 30}
+    if tithi_num in good_tithis:
+        score += 1
+    elif tithi_num in bad_tithis:
+        score -= 1
+
+    yoga_name = pan.get("yoga", {}).get("name", "")
+    good_yogas = {"Siddhi", "Amriti", "Shubha", "Labha", "Sukla", "Brahma", "Indra"}
+    bad_yogas  = {"Vyatipata", "Ganda", "Shoola", "Atiganda", "Vajra", "Vyaghata"}
+    if yoga_name in good_yogas:
+        score += 1
+    elif yoga_name in bad_yogas:
+        score -= 1
+
+    score = max(1, min(10, score))
+
+    if score >= 8:
+        color, label = "#16a34a", "Excellent"
+    elif score >= 6:
+        color, label = "#65a30d", "Good"
+    elif score >= 5:
+        color, label = "#d97706", "Moderate"
+    elif score >= 3:
+        color, label = "#ea580c", "Caution"
+    else:
+        color, label = "#dc2626", "Difficult"
+
+    return {
+        "score":     score,
+        "color":     color,
+        "label":     label,
+        "tithi":     pan.get("tithi", {}).get("name", ""),
+        "nakshatra": pan.get("nakshatra", {}).get("name", ""),
+        "vara":      vara_lord,
+    }
 
 
 # ─────────────────────────────────────────────

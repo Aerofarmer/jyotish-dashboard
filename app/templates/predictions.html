@@ -1,19 +1,63 @@
 {% extends "base.html" %}
-{% block title %}Today's Predictions — {{ name or 'Jyotish Dashboard' }}{% endblock %}
+{% block title %}Predictions — {{ name or 'Jyotish Dashboard' }}{% endblock %}
 
 {% block content %}
 <div class="page-header mb-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
   <div>
-    <h1 class="page-title"><i class="bi bi-magic me-2"></i>Today's Predictions</h1>
+    <h1 class="page-title"><i class="bi bi-magic me-2"></i>Daily Predictions</h1>
     <p class="page-sub">आज का राशिफल — Based on transit, dasha &amp; panchang</p>
   </div>
   {% if preds %}
   <div class="text-end">
     <div class="native-name">{{ name }}</div>
     <div class="native-detail">{{ place }}</div>
-    <div class="native-detail text-muted">{{ preds.date }}</div>
+    <div class="native-detail" style="color:var(--gold);font-weight:600">{{ preds.date }}</div>
   </div>
   {% endif %}
+</div>
+
+{# ── Date navigation bar ──────────────────────────────────────────────── #}
+<div class="date-bar">
+  <i class="bi bi-calendar3" style="color:var(--gold);font-size:1.1rem"></i>
+  <span class="date-bar-label">Viewing predictions for</span>
+  <input type="date" id="pred-date-input"
+         value="{{ selected_date }}"
+         max="{{ today }}"
+         onchange="gotoDate(this.value)"/>
+  {% if selected_date != today %}
+  <a href="{{ url_for('main.predictions') }}" class="btn btn-vedic btn-xs ms-auto">
+    <i class="bi bi-arrow-left-circle me-1"></i>Back to Today
+  </a>
+  {% endif %}
+  <button class="btn btn-outline-gold btn-xs ms-auto" onclick="toggleCalendar()"
+          id="cal-toggle-btn">
+    <i class="bi bi-calendar-week me-1"></i>Month View
+  </button>
+</div>
+
+{# ── Month calendar ───────────────────────────────────────────────────── #}
+<div class="pred-calendar" id="pred-calendar" style="display:none">
+  <div class="pred-cal-header">
+    <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
+    <span class="pred-cal-title" id="cal-month-title">Loading…</span>
+    <button class="cal-nav-btn" id="cal-next">&#8250;</button>
+  </div>
+  <div class="cal-weekdays">
+    <div class="cal-wd">Sun</div><div class="cal-wd">Mon</div>
+    <div class="cal-wd">Tue</div><div class="cal-wd">Wed</div>
+    <div class="cal-wd">Thu</div><div class="cal-wd">Fri</div>
+    <div class="cal-wd">Sat</div>
+  </div>
+  <div class="cal-grid" id="cal-grid">
+    <div class="cal-loading"><i class="bi bi-arrow-repeat"></i> Loading panchang…</div>
+  </div>
+  <div class="cal-legend">
+    <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#16a34a"></span>Excellent</span>
+    <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#65a30d"></span>Good</span>
+    <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#d97706"></span>Moderate</span>
+    <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#ea580c"></span>Caution</span>
+    <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#dc2626"></span>Difficult</span>
+  </div>
 </div>
 
 {% if error %}
@@ -524,4 +568,130 @@
 </div>
 
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Date navigation ─────────────────────────────────────────────
+function gotoDate(val) {
+  if (val) window.location.href = '/predictions?date=' + val;
+}
+
+// ── Calendar state ──────────────────────────────────────────────
+const TODAY_STR   = "{{ today }}";
+const SEL_STR     = "{{ selected_date }}";
+const LAT         = {{ session.get('birth_lat', 28.6139) }};
+const LON         = {{ session.get('birth_lon', 77.2090) }};
+const TZ          = "{{ session.get('birth_tz', 'Asia/Kolkata') }}";
+
+let calYear, calMonth;
+
+(function init() {
+  const d = new Date(SEL_STR + "T12:00:00");
+  calYear  = d.getFullYear();
+  calMonth = d.getMonth() + 1;
+})();
+
+const MONTH_NAMES = ["January","February","March","April","May","June",
+                     "July","August","September","October","November","December"];
+
+let scoreCache = {};
+
+function toggleCalendar() {
+  const cal = document.getElementById("pred-calendar");
+  const btn = document.getElementById("cal-toggle-btn");
+  if (cal.style.display === "none") {
+    cal.style.display = "block";
+    btn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Close Calendar';
+    loadMonth(calYear, calMonth);
+  } else {
+    cal.style.display = "none";
+    btn.innerHTML = '<i class="bi bi-calendar-week me-1"></i>Month View';
+  }
+}
+
+function loadMonth(year, month) {
+  const key = `${year}-${month}`;
+  document.getElementById("cal-month-title").textContent =
+    MONTH_NAMES[month-1] + " " + year;
+
+  if (scoreCache[key]) {
+    renderCalendar(year, month, scoreCache[key]);
+    return;
+  }
+
+  document.getElementById("cal-grid").innerHTML =
+    '<div class="cal-loading"><i class="bi bi-arrow-repeat"></i> Loading…</div>';
+
+  fetch(`/api/month-scores?year=${year}&month=${month}&lat=${LAT}&lon=${LON}&tz=${encodeURIComponent(TZ)}`)
+    .then(r => r.json())
+    .then(data => {
+      scoreCache[key] = data;
+      renderCalendar(year, month, data);
+    })
+    .catch(() => {
+      document.getElementById("cal-grid").innerHTML =
+        '<div class="cal-loading text-danger">Could not load panchang data.</div>';
+    });
+}
+
+function renderCalendar(year, month, scores) {
+  const grid      = document.getElementById("cal-grid");
+  const firstDay  = new Date(year, month - 1, 1).getDay();  // 0=Sun
+  const daysInMon = new Date(year, month, 0).getDate();
+  const todayD    = new Date(TODAY_STR + "T12:00:00");
+  const selD      = new Date(SEL_STR   + "T12:00:00");
+
+  let html = "";
+
+  // Empty leading cells
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="cal-day empty"></div>';
+  }
+
+  for (let day = 1; day <= daysInMon; day++) {
+    const d      = new Date(year, month - 1, day);
+    const iso    = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    const isToday = d.toDateString() === todayD.toDateString();
+    const isSel   = d.toDateString() === selD.toDateString();
+    const score   = scores[String(day)] || {color:"#9ca3af", label:"—", score:5};
+    const future  = d > todayD;
+
+    let cls = "cal-day";
+    if (isToday)  cls += " today";
+    if (isSel)    cls += " selected";
+    if (future)   cls += " future";
+
+    const href  = future ? "#" : `/predictions?date=${iso}`;
+    const click = future ? `onclick="return false;"` : "";
+
+    const tooltip = `${score.label} (${score.score}/10)` +
+                    (score.tithi ? ` · ${score.tithi}` : "") +
+                    (score.vara  ? ` · ${score.vara}` : "");
+
+    html += `<a href="${href}" class="${cls}" title="${tooltip}" ${click}>
+               <div class="cal-d-num">${day}</div>
+               ${!isSel ? `<div class="cal-d-dot" style="background:${score.color}"></div>` : ""}
+               <div class="cal-d-label" style="color:${score.color}">${score.label}</div>
+             </a>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+document.getElementById("cal-prev").addEventListener("click", () => {
+  calMonth--;
+  if (calMonth < 1) { calMonth = 12; calYear--; }
+  loadMonth(calYear, calMonth);
+});
+
+document.getElementById("cal-next").addEventListener("click", () => {
+  const now = new Date(TODAY_STR + "T12:00:00");
+  if (calYear > now.getFullYear() ||
+      (calYear === now.getFullYear() && calMonth >= now.getMonth() + 1)) return;
+  calMonth++;
+  if (calMonth > 12) { calMonth = 1; calYear++; }
+  loadMonth(calYear, calMonth);
+});
+</script>
 {% endblock %}
