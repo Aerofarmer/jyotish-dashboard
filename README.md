@@ -53,7 +53,7 @@ Prediction Calendar                     Day detail panel
 
 ```bash
 # 1. Clone
-git clone https://github.com/YOUR_USERNAME/jyotish-dashboard.git
+git clone https://github.com/Aerofarmer/jyotish-dashboard.git
 cd jyotish-dashboard
 
 # 2. Set up environment
@@ -82,7 +82,7 @@ SE_EPHE_PATH=./ephe python run.py
 
 ```bash
 # 1. Clone
-git clone https://github.com/YOUR_USERNAME/jyotish-dashboard.git
+git clone https://github.com/Aerofarmer/jyotish-dashboard.git
 cd jyotish-dashboard
 
 # 2. Copy env file
@@ -103,7 +103,7 @@ docker compose logs -f
 ### Option 3 · Linux Desktop (Ubuntu / Debian — installs as a launcher icon)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/jyotish-dashboard.git
+git clone https://github.com/Aerofarmer/jyotish-dashboard.git
 cd jyotish-dashboard
 chmod +x install.sh && ./install.sh
 # Adds "Jyotish Dashboard" to your app menu
