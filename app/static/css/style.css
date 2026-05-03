@@ -1166,3 +1166,82 @@ body {
 .cal-day.active-detail .cal-d-dot { display: none; }
 .cal-day.active-detail .cal-d-label { color: rgba(255,255,255,0.85); }
 .cal-day.future { opacity: 0.4; cursor: default; }
+
+/* ── Export panel ────────────────────────────────────── */
+.export-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  margin-bottom: 1.5rem;
+}
+
+.export-panel-header {
+  background: var(--bg-card2);
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-panel-body { padding: 14px 16px; }
+
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.export-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.export-info { flex: 1; min-width: 140px; }
+.export-title { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+.export-desc  { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+
+.export-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.export-month-sel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.claude-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(124,58,237,0.08);
+  border: 1px solid #7c3aed;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}

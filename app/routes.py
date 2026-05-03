@@ -1,6 +1,8 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
-from datetime import datetime, date
+from flask import (Blueprint, render_template, request, jsonify, session,
+                   redirect, url_for, flash, Response)
+from datetime import datetime, date, timedelta
 import calendar as cal_mod
+import zipfile, io, os, re
 import pytz
 import traceback
 
@@ -421,6 +423,269 @@ def day_detail():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+#  Export: iCal (.ics) — Google/Apple/Outlook
+# ─────────────────────────────────────────────
+@main.route("/export/ics")
+def export_ics():
+    year   = int(request.args.get("year",  date.today().year))
+    month  = int(request.args.get("month", date.today().month))
+    lat    = float(request.args.get("lat",  session.get("birth_lat", 28.6139)))
+    lon    = float(request.args.get("lon",  session.get("birth_lon", 77.2090)))
+    tz_str = request.args.get("tz", session.get("birth_tz", "Asia/Kolkata"))
+    name   = session.get("birth_name", "Vedic")
+
+    num_days = cal_mod.monthrange(year, month)[1]
+    lines    = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        f"PRODID:-//Jyotish Dashboard//jyotish-{year}-{month:02d}//EN",
+        f"X-WR-CALNAME:Vedic Panchang {cal_mod.month_name[month]} {year}",
+        "X-WR-CALDESC:Daily panchang quality from Jyotish Dashboard",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+    ]
+
+    QUALITY_EMOJI = {
+        "Excellent": "🟢", "Good": "🟡", "Moderate": "🟠",
+        "Caution": "🔴", "Difficult": "❌",
+    }
+
+    for day in range(1, num_days + 1):
+        d = date(year, month, day)
+        try:
+            pan = calculate_panchang(d, lat, lon, tz_str, None)
+            sky = get_sunrise_sunset_moonrise(d, lat, lon, tz_str)
+            q   = _quick_day_score(pan, d)
+            # Try Claude AI note if API key available
+            ai_note = _claude_day_note(pan, q, d.isoformat())
+
+            tithi     = pan.get("tithi",     {}).get("name", "")
+            nakshatra = pan.get("nakshatra", {}).get("name", "")
+            yoga      = pan.get("yoga",      {}).get("name", "")
+            vara      = pan.get("vara",      {}).get("lord", "")
+            rahu      = sky.get("rahu_kaal", "")
+            abhijit   = pan.get("abhijit_muhurta", "")
+
+            emoji     = QUALITY_EMOJI.get(q["label"], "⚪")
+            summary   = f"{emoji} {q['label']} Day · {tithi} · {nakshatra}"
+            if name and name != "Vedic":
+                summary = f"{emoji} {q['label']} ({name}) · {tithi} · {nakshatra}"
+
+            desc_parts = [
+                f"Day Quality: {q['label']} ({q['score']}/10)",
+                f"Vara: {vara}  |  Tithi: {tithi}  |  Nakshatra: {nakshatra}",
+                f"Yoga: {yoga}",
+                f"Sunrise: {sky.get('sunrise','')}  |  Sunset: {sky.get('sunset','')}",
+                f"Rahu Kaal: {rahu}",
+                f"Abhijit Muhurta: {abhijit}",
+            ]
+            if ai_note:
+                desc_parts.append(f"\n{ai_note}")
+
+            desc = "\\n".join(desc_parts)
+            dt_start = d.strftime("%Y%m%d")
+            dt_end   = (d + timedelta(days=1)).strftime("%Y%m%d")
+            uid      = f"jyotish-{d.isoformat()}@dashboard"
+
+            lines += [
+                "BEGIN:VEVENT",
+                f"UID:{uid}",
+                f"DTSTART;VALUE=DATE:{dt_start}",
+                f"DTEND;VALUE=DATE:{dt_end}",
+                f"SUMMARY:{summary}",
+                f"DESCRIPTION:{desc}",
+                f"CATEGORIES:{q['label']},Panchang",
+                "STATUS:CONFIRMED",
+                "END:VEVENT",
+            ]
+        except Exception:
+            pass
+
+    lines.append("END:VCALENDAR")
+    ics_content = "\r\n".join(lines) + "\r\n"
+    filename    = f"vedic-panchang-{year}-{month:02d}.ics"
+    return Response(
+        ics_content,
+        mimetype="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ─────────────────────────────────────────────
+#  Export: Obsidian vault ZIP
+# ─────────────────────────────────────────────
+@main.route("/export/obsidian")
+def export_obsidian():
+    year   = int(request.args.get("year",  date.today().year))
+    month  = int(request.args.get("month", date.today().month))
+    lat    = float(request.args.get("lat",  session.get("birth_lat", 28.6139)))
+    lon    = float(request.args.get("lon",  session.get("birth_lon", 77.2090)))
+    tz_str = request.args.get("tz", session.get("birth_tz", "Asia/Kolkata"))
+    name   = session.get("birth_name", "")
+
+    num_days = cal_mod.monthrange(year, month)[1]
+    buf      = io.BytesIO()
+
+    QUALITY_EMOJI = {
+        "Excellent": "🟢", "Good": "🟡", "Moderate": "🟠",
+        "Caution": "🔴", "Difficult": "❌",
+    }
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for day in range(1, num_days + 1):
+            d = date(year, month, day)
+            try:
+                pan = calculate_panchang(d, lat, lon, tz_str, None)
+                sky = get_sunrise_sunset_moonrise(d, lat, lon, tz_str)
+                q   = _quick_day_score(pan, d)
+                ai_note = _claude_day_note(pan, q, d.isoformat())
+
+                tithi     = pan.get("tithi",     {})
+                nakshatra = pan.get("nakshatra", {})
+                yoga      = pan.get("yoga",      {})
+                karana    = pan.get("karana",    {})
+                vara      = pan.get("vara",      {})
+                tarabala  = pan.get("tarabala",  {})
+                cbala     = pan.get("chandra_bala", {})
+
+                q_icon = QUALITY_EMOJI.get(q["label"], "⚪")
+                weekday = d.strftime("%A")
+
+                lines = [
+                    "---",
+                    f'date: "{d.isoformat()}"',
+                    f'weekday: "{weekday}"',
+                    f'tithi: "{tithi.get("name","")}"',
+                    f'nakshatra: "{nakshatra.get("name","")}"',
+                    f'yoga: "{yoga.get("name","")}"',
+                    f'vara: "{vara.get("lord","")}"',
+                    f'quality: "{q["label"]}"',
+                    f'score: {q["score"]}',
+                    f'tags: [panchang, vedic, {q["label"].lower()}]',
+                    "---",
+                    "",
+                    f"# {q_icon} {d.strftime('%-d %B %Y')} — {q['label']} Day",
+                    "",
+                ]
+
+                if ai_note:
+                    lines += ["> [!note] Vedic Insight", f"> {ai_note}", ""]
+
+                lines += [
+                    "## Panchang",
+                    "",
+                    f"| Limb | Value | Quality |",
+                    f"|---|---|---|",
+                    f"| **Vara** | {weekday} (Lord: {vara.get('lord','')}) | {'✅' if vara.get('lord') in ['Moon','Jupiter','Venus','Mercury'] else '⚠️'} |",
+                    f"| **Tithi** | {tithi.get('name','')} ({tithi.get('paksha','')}) | {'✅' if tithi.get('quality','') == 'Auspicious' else '⚠️'} |",
+                    f"| **Nakshatra** | {nakshatra.get('name','')} (Lord: {nakshatra.get('lord','')}) | {'✅' if nakshatra.get('nature','') == 'Auspicious' else '⚠️'} |",
+                    f"| **Yoga** | {yoga.get('name','')} | {'✅' if yoga.get('nature','') == 'Auspicious' else '⚠️'} |",
+                    f"| **Karana** | {karana.get('name','')} | — |",
+                    "",
+                    "## Sky",
+                    "",
+                    f"| | Time |",
+                    f"|---|---|",
+                    f"| 🌅 Sunrise | {sky.get('sunrise','—')} |",
+                    f"| 🌇 Sunset | {sky.get('sunset','—')} |",
+                    f"| ☀️ Solar Noon | {sky.get('solar_noon','—')} |",
+                    f"| 🌙 Moonrise | {sky.get('moonrise','—')} |",
+                    f"| 🌑 Moonset | {sky.get('moonset','—')} |",
+                    f"| ⏱ Day Length | {sky.get('day_length','—')} |",
+                    "",
+                    "## Auspicious",
+                    "",
+                    f"- ✅ **Abhijit Muhurta**: {pan.get('abhijit_muhurta','—')}",
+                    "",
+                ]
+
+                if tarabala:
+                    lines.append(f"- ⭐ **Tarabala**: {tarabala.get('name','—')} — {tarabala.get('quality','—')}")
+                if cbala:
+                    lines.append(f"- 🌙 **Chandra Bala**: {cbala.get('quality','—')}")
+                lines.append("")
+
+                lines += [
+                    "## Inauspicious Periods",
+                    "",
+                    f"- ⚠️ **Rahu Kaal**: {sky.get('rahu_kaal','—')}",
+                    f"- ⚠️ **Gulika Kaal**: {sky.get('gulika_kaal','—')}",
+                    f"- ⚠️ **Yamaghanta**: {sky.get('yamaghanta','—')}",
+                    "",
+                    "---",
+                    f"*Generated by [Jyotish Dashboard](https://github.com/Aerofarmer/jyotish-dashboard)*",
+                ]
+
+                md_content = "\n".join(lines)
+                fname = f"{d.isoformat()}.md"
+                zf.writestr(f"Panchang/{year}-{month:02d}/{fname}", md_content)
+
+            except Exception:
+                pass
+
+        # Index file
+        index_lines = [
+            f"# Vedic Panchang — {cal_mod.month_name[month]} {year}",
+            "",
+            f"{'Name: ' + name if name else ''}",
+            "",
+            "| Date | Day | Quality | Score | Tithi | Nakshatra |",
+            "|---|---|---|---|---|---|",
+        ]
+        # rebuild quick for index
+        for day in range(1, num_days + 1):
+            d = date(year, month, day)
+            try:
+                pan = calculate_panchang(d, lat, lon, tz_str, None)
+                q   = _quick_day_score(pan, d)
+                emoji = QUALITY_EMOJI.get(q["label"], "⚪")
+                index_lines.append(
+                    f"| [[{d.isoformat()}]] | {d.strftime('%A')} | {emoji} {q['label']} | {q['score']}/10 | {pan.get('tithi',{}).get('name','')} | {pan.get('nakshatra',{}).get('name','')} |"
+                )
+            except Exception:
+                pass
+        zf.writestr(f"Panchang/{year}-{month:02d}/INDEX.md", "\n".join(index_lines))
+
+    buf.seek(0)
+    filename = f"vedic-panchang-obsidian-{year}-{month:02d}.zip"
+    return Response(
+        buf.getvalue(),
+        mimetype="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ─────────────────────────────────────────────
+#  Claude AI day note (optional enrichment)
+# ─────────────────────────────────────────────
+def _claude_day_note(pan: dict, score: dict, date_str: str) -> str | None:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        import anthropic
+        tithi     = pan.get("tithi",     {}).get("name", "")
+        nakshatra = pan.get("nakshatra", {}).get("name", "")
+        yoga      = pan.get("yoga",      {}).get("name", "")
+        vara      = pan.get("vara",      {}).get("lord", "")
+        prompt    = (
+            f"You are a Jyotish (Vedic astrology) expert. Write exactly 2 practical sentences "
+            f"for {date_str}: Tithi={tithi}, Nakshatra={nakshatra}, Yoga={yoga}, "
+            f"Vara lord={vara}, Day quality={score['label']} ({score['score']}/10). "
+            f"Be specific and actionable. No headers, no markdown."
+        )
+        client = anthropic.Anthropic(api_key=api_key)
+        msg    = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=120,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text.strip()
+    except Exception:
+        return None
 
 
 # ─────────────────────────────────────────────

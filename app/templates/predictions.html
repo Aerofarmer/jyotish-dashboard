@@ -61,6 +61,95 @@
   <div id="day-detail-panel"></div>
 </div>
 
+{# ── Export panel ─────────────────────────────────────────────── #}
+<div class="export-panel">
+  <div class="export-panel-header">
+    <i class="bi bi-cloud-arrow-up me-1"></i>Sync &amp; Export
+    {% if config.get('ANTHROPIC_API_KEY') or false %}
+    <span class="claude-badge ms-auto"><i class="bi bi-stars me-1"></i>Claude AI notes on</span>
+    {% endif %}
+  </div>
+  <div class="export-panel-body">
+
+    {# iCal / Apple / Outlook #}
+    <div class="export-option">
+      <div class="export-icon" style="background:rgba(0,122,255,0.1);color:#007aff">📅</div>
+      <div class="export-info">
+        <div class="export-title">iCal — Apple / Outlook / Any calendar</div>
+        <div class="export-desc">Download a .ics file with daily quality events, panchang notes, Rahu Kaal &amp; Abhijit times. Import once or subscribe.</div>
+      </div>
+      <div class="export-controls">
+        <select class="export-month-sel" id="ics-month-sel">
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}" {% if m == selected_date[:7]|int(base=10) or m == today[:5][-2:]|int(base=10) %}selected{% endif %}>
+            {{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}
+          </option>
+          {% endfor %}
+        </select>
+        <select class="export-month-sel" id="ics-year-sel">
+          {% for y in range(today[:4]|int - 1, today[:4]|int + 2) %}
+          <option value="{{ y }}" {% if y == today[:4]|int %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+        <a id="ics-download-btn" href="#" onclick="downloadIcs()" class="btn btn-vedic btn-xs">
+          <i class="bi bi-download me-1"></i>Download .ics
+        </a>
+      </div>
+    </div>
+
+    {# Google Calendar #}
+    <div class="export-option">
+      <div class="export-icon" style="background:rgba(66,133,244,0.1);color:#4285f4">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3zM9 17.25H6.75v-7.5H9v7.5zm-1.125-8.625a1.313 1.313 0 110-2.625 1.313 1.313 0 010 2.625zM18 17.25h-2.25v-3.75c0-.84-.69-1.5-1.5-1.5s-1.5.66-1.5 1.5v3.75H10.5v-7.5h2.25v1.14A3.75 3.75 0 0118 14.25v3z"/></svg>
+      </div>
+      <div class="export-info">
+        <div class="export-title">Google Calendar</div>
+        <div class="export-desc">Import the .ics file above into Google Calendar, or click any day in the calendar below and use "Add to Google Calendar".</div>
+      </div>
+      <div class="export-controls">
+        <a href="https://calendar.google.com/calendar/r/settings/import" target="_blank"
+           class="btn btn-outline-gold btn-xs">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open GCal Import
+        </a>
+      </div>
+    </div>
+
+    {# Obsidian #}
+    <div class="export-option">
+      <div class="export-icon" style="background:rgba(124,58,237,0.1);color:#7c3aed">🔮</div>
+      <div class="export-info">
+        <div class="export-title">Obsidian Vault</div>
+        <div class="export-desc">Download a ZIP of daily <code>.md</code> notes with YAML frontmatter, panchang tables, sky times, muhurtas, and an INDEX file.
+          {% if config.get('ANTHROPIC_API_KEY') %}<span class="claude-badge ms-1"><i class="bi bi-stars"></i> +Claude insights</span>{% endif %}
+        </div>
+      </div>
+      <div class="export-controls">
+        <select class="export-month-sel" id="obs-month-sel">
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}" {% if m == today[5:7]|int %}selected{% endif %}>
+            {{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}
+          </option>
+          {% endfor %}
+        </select>
+        <select class="export-month-sel" id="obs-year-sel">
+          {% for y in range(today[:4]|int - 1, today[:4]|int + 2) %}
+          <option value="{{ y }}" {% if y == today[:4]|int %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+        <a href="#" onclick="downloadObsidian()" class="btn btn-vedic btn-xs" style="background:linear-gradient(135deg,#4c1d95,#7c3aed)">
+          <i class="bi bi-download me-1"></i>Download ZIP
+        </a>
+      </div>
+    </div>
+
+    <div class="text-muted" style="font-size:0.72rem;margin-top:6px">
+      <i class="bi bi-info-circle me-1"></i>
+      Add <code>ANTHROPIC_API_KEY</code> to your <code>.env</code> to enrich exports with 2-sentence Claude AI Vedic insights per day.
+      All astrology calculations are <strong>fully offline</strong> — Claude is optional.
+    </div>
+  </div>
+</div>
+
 {% if error %}
 <div class="alert alert-warning">
   <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
@@ -760,11 +849,20 @@ function renderDetailPanel(d) {
   const isToday = d.date === TODAY_STR;
   const isFuture = new Date(d.date+"T12:00:00") > new Date(TODAY_STR+"T12:00:00");
 
+  // Google Calendar quick-add URL for this day
+  const gcTitle = encodeURIComponent(`${sc.label} day — ${d.panchang?.nakshatra || ''} Nakshatra`);
+  const gcDetails = encodeURIComponent(`Tithi: ${d.panchang?.tithi||''} | Vara: ${d.weekday} | ${sc.label}\nRahu Kaal: ${d.sky?.rahu_kaal||''}`);
+  const gcDate = d.date.replace(/-/g,'');
+  const gcUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${gcTitle}&dates=${gcDate}/${gcDate}&details=${gcDetails}`;
+
   const cta = `
     <div class="ddp-cta">
       ${!isFuture ? `<a href="/predictions?date=${d.date}" class="btn btn-vedic btn-xs flex-grow-1">
         <i class="bi bi-magic me-1"></i>${isToday ? "Today's Full Predictions" : "Predictions for this Day"} →
       </a>` : `<span class="text-muted small"><i class="bi bi-lock me-1"></i>Future date — predictions unavailable</span>`}
+      <a href="${gcUrl}" target="_blank" class="btn btn-outline-gold btn-xs" title="Add to Google Calendar">
+        <i class="bi bi-google me-1"></i>GCal
+      </a>
       <button class="btn btn-outline-gold btn-xs" onclick="clearDetailPanel();renderCalendar(calYear,calMonth,scoreCache[calYear+'-'+calMonth]||{})">
         <i class="bi bi-x"></i>
       </button>
@@ -827,5 +925,26 @@ document.getElementById("cal-next").addEventListener("click", () => {
   calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; }
   loadMonth(calYear, calMonth);
 });
+
+// ── Export helpers ─────────────────────────────────────────────────────────
+function downloadIcs() {
+  const y = document.getElementById('ics-year-sel').value;
+  const m = document.getElementById('ics-month-sel').value;
+  window.location.href = `/export/ics?year=${y}&month=${m}&lat=${LAT}&lon=${LON}&tz=${encodeURIComponent(TZ)}`;
+}
+function downloadObsidian() {
+  const y = document.getElementById('obs-year-sel').value;
+  const m = document.getElementById('obs-month-sel').value;
+  window.location.href = `/export/obsidian?year=${y}&month=${m}&lat=${LAT}&lon=${LON}&tz=${encodeURIComponent(TZ)}`;
+}
+// Pre-fill Google Calendar import link with current month label
+(function() {
+  const gcLink = document.getElementById('gc-import-link');
+  if (gcLink) {
+    const label = new Date(calYear, calMonth - 1, 1)
+      .toLocaleString('default', { month: 'long', year: 'numeric' });
+    gcLink.title = `Import ${label} iCal into Google Calendar`;
+  }
+})();
 </script>
 {% endblock %}
