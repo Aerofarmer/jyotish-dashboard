@@ -8,6 +8,7 @@ load_dotenv()
 def create_app():
     app = Flask(__name__)
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "kundli-vedic-secret-2024")
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
     CORS(app)
 
     # Expose LLM config to templates via config.get(...)

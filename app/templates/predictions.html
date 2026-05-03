@@ -920,9 +920,11 @@ document.getElementById("cal-prev").addEventListener("click", () => {
   loadMonth(calYear, calMonth);
 });
 document.getElementById("cal-next").addEventListener("click", () => {
+  // Allow browsing up to 12 months ahead (panchang is fully calculable for future)
   const now = new Date(TODAY_STR + "T12:00:00");
-  if (calYear > now.getFullYear() ||
-     (calYear === now.getFullYear() && calMonth >= now.getMonth() + 1)) return;
+  const maxYear  = now.getFullYear() + 1;
+  const maxMonth = now.getMonth() + 1;   // same month next year
+  if (calYear > maxYear || (calYear === maxYear && calMonth >= maxMonth)) return;
   calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; }
   loadMonth(calYear, calMonth);
 });
