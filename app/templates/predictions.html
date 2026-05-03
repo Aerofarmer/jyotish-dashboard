@@ -65,8 +65,8 @@
 <div class="export-panel">
   <div class="export-panel-header">
     <i class="bi bi-cloud-arrow-up me-1"></i>Sync &amp; Export
-    {% if config.get('ANTHROPIC_API_KEY') or false %}
-    <span class="claude-badge ms-auto"><i class="bi bi-stars me-1"></i>Claude AI notes on</span>
+    {% if config.get('LLM_MODEL') %}
+    <span class="claude-badge ms-auto"><i class="bi bi-stars me-1"></i>AI notes on · {{ config.get('LLM_MODEL') }}</span>
     {% endif %}
   </div>
   <div class="export-panel-body">
@@ -81,7 +81,7 @@
       <div class="export-controls">
         <select class="export-month-sel" id="ics-month-sel">
           {% for m in range(1, 13) %}
-          <option value="{{ m }}" {% if m == selected_date[:7]|int(base=10) or m == today[:5][-2:]|int(base=10) %}selected{% endif %}>
+          <option value="{{ m }}" {% if m == today[5:7]|int %}selected{% endif %}>
             {{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}
           </option>
           {% endfor %}
@@ -120,7 +120,7 @@
       <div class="export-info">
         <div class="export-title">Obsidian Vault</div>
         <div class="export-desc">Download a ZIP of daily <code>.md</code> notes with YAML frontmatter, panchang tables, sky times, muhurtas, and an INDEX file.
-          {% if config.get('ANTHROPIC_API_KEY') %}<span class="claude-badge ms-1"><i class="bi bi-stars"></i> +Claude insights</span>{% endif %}
+          {% if config.get('LLM_MODEL') %}<span class="claude-badge ms-1"><i class="bi bi-stars"></i> +AI insights ({{ config.get('LLM_MODEL') }})</span>{% endif %}
         </div>
       </div>
       <div class="export-controls">
@@ -144,8 +144,9 @@
 
     <div class="text-muted" style="font-size:0.72rem;margin-top:6px">
       <i class="bi bi-info-circle me-1"></i>
-      Add <code>ANTHROPIC_API_KEY</code> to your <code>.env</code> to enrich exports with 2-sentence Claude AI Vedic insights per day.
-      All astrology calculations are <strong>fully offline</strong> — Claude is optional.
+      Set <code>LLM_MODEL</code> in your <code>.env</code> to enrich exports with 2-sentence Vedic AI insights per day.
+      Works with <strong>Ollama</strong> (local/free), Groq, or OpenRouter — see <code>.env.example</code> for setup.
+      All astrology calculations are <strong>fully offline</strong> — AI is optional.
     </div>
   </div>
 </div>

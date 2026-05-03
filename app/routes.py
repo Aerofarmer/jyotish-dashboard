@@ -659,33 +659,51 @@ def export_obsidian():
 
 
 # ─────────────────────────────────────────────
-#  Claude AI day note (optional enrichment)
+#  Open-LLM day note (optional enrichment)
+#  Works with Ollama (local), Groq, OpenRouter,
+#  LM Studio — any OpenAI-compatible endpoint.
 # ─────────────────────────────────────────────
-def _claude_day_note(pan: dict, score: dict, date_str: str) -> str | None:
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return None
+_JYOTISHI_SYSTEM = (
+    "You are Jyotishi, a traditional Vedic astrologer with mastery of Jyotish shastra, "
+    "panchang limbs, nakshatras, and daily muhurtas. "
+    "Respond in exactly 2 sentences. "
+    "First sentence: describe the cosmic energy of the day using Sanskrit terms naturally. "
+    "Second sentence: give one concrete, practical guidance the native can act on today. "
+    "Never use bullet points, headers, or markdown. Be concise and mystical."
+)
+
+def _llm_day_note(pan: dict, score: dict, date_str: str) -> str | None:
+    base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+    api_key  = os.getenv("LLM_API_KEY",  "ollama")   # 'ollama' works for local Ollama
+    model    = os.getenv("LLM_MODEL",    "llama3.2")
     try:
-        import anthropic
+        from openai import OpenAI
         tithi     = pan.get("tithi",     {}).get("name", "")
         nakshatra = pan.get("nakshatra", {}).get("name", "")
         yoga      = pan.get("yoga",      {}).get("name", "")
         vara      = pan.get("vara",      {}).get("lord", "")
-        prompt    = (
-            f"You are a Jyotish (Vedic astrology) expert. Write exactly 2 practical sentences "
-            f"for {date_str}: Tithi={tithi}, Nakshatra={nakshatra}, Yoga={yoga}, "
-            f"Vara lord={vara}, Day quality={score['label']} ({score['score']}/10). "
-            f"Be specific and actionable. No headers, no markdown."
+        user_msg  = (
+            f"Date: {date_str}\n"
+            f"Tithi: {tithi} | Nakshatra: {nakshatra} | Yoga: {yoga} | Vara lord: {vara}\n"
+            f"Day quality: {score.get('label','')} ({score.get('score',5)}/10)\n"
+            "Write the 2-sentence Vedic insight now."
         )
-        client = anthropic.Anthropic(api_key=api_key)
-        msg    = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=120,
-            messages=[{"role": "user", "content": prompt}],
+        client = OpenAI(base_url=base_url, api_key=api_key)
+        resp   = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _JYOTISHI_SYSTEM},
+                {"role": "user",   "content": user_msg},
+            ],
+            max_tokens=130,
+            temperature=0.72,
         )
-        return msg.content[0].text.strip()
+        return resp.choices[0].message.content.strip()
     except Exception:
         return None
+
+# backward-compat alias used in iCal + Obsidian export routes
+_claude_day_note = _llm_day_note
 
 
 # ─────────────────────────────────────────────
