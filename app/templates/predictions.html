@@ -66,7 +66,7 @@
   <div class="export-panel-header">
     <i class="bi bi-cloud-arrow-up me-1"></i>Sync &amp; Export
     {% if config.get('LLM_MODEL') %}
-    <span class="claude-badge ms-auto"><i class="bi bi-stars me-1"></i>AI notes on · {{ config.get('LLM_MODEL') }}</span>
+    <span class="ai-badge ms-auto"><i class="bi bi-stars me-1"></i>AI notes on · {{ config.get('LLM_MODEL') }}</span>
     {% endif %}
   </div>
   <div class="export-panel-body">
@@ -120,7 +120,7 @@
       <div class="export-info">
         <div class="export-title">Obsidian Vault</div>
         <div class="export-desc">Download a ZIP of daily <code>.md</code> notes with YAML frontmatter, panchang tables, sky times, muhurtas, and an INDEX file.
-          {% if config.get('LLM_MODEL') %}<span class="claude-badge ms-1"><i class="bi bi-stars"></i> +AI insights ({{ config.get('LLM_MODEL') }})</span>{% endif %}
+          {% if config.get('LLM_MODEL') %}<span class="ai-badge ms-1"><i class="bi bi-stars"></i> +AI insights ({{ config.get('LLM_MODEL') }})</span>{% endif %}
         </div>
       </div>
       <div class="export-controls">

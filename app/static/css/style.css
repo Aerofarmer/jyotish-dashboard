@@ -1231,7 +1231,7 @@ body {
   color: var(--text-primary);
 }
 
-.claude-badge {
+.ai-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
