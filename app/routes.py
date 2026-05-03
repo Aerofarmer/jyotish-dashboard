@@ -459,8 +459,7 @@ def export_ics():
             pan = calculate_panchang(d, lat, lon, tz_str, None)
             sky = get_sunrise_sunset_moonrise(d, lat, lon, tz_str)
             q   = _quick_day_score(pan, d)
-            # Try Claude AI note if API key available
-            ai_note = _claude_day_note(pan, q, d.isoformat())
+            ai_note = _llm_day_note(pan, q, d.isoformat())
 
             tithi     = pan.get("tithi",     {}).get("name", "")
             nakshatra = pan.get("nakshatra", {}).get("name", "")
@@ -541,7 +540,7 @@ def export_obsidian():
                 pan = calculate_panchang(d, lat, lon, tz_str, None)
                 sky = get_sunrise_sunset_moonrise(d, lat, lon, tz_str)
                 q   = _quick_day_score(pan, d)
-                ai_note = _claude_day_note(pan, q, d.isoformat())
+                ai_note = _llm_day_note(pan, q, d.isoformat())
 
                 tithi     = pan.get("tithi",     {})
                 nakshatra = pan.get("nakshatra", {})
@@ -702,8 +701,6 @@ def _llm_day_note(pan: dict, score: dict, date_str: str) -> str | None:
     except Exception:
         return None
 
-# backward-compat alias used in iCal + Obsidian export routes
-_claude_day_note = _llm_day_note
 
 
 # ─────────────────────────────────────────────
