@@ -1,35 +1,48 @@
 #!/usr/bin/env bash
-# ──────────────────────────────────────────────────────
-#  Jyotish Dashboard — local launcher (non-Docker)
+# ══════════════════════════════════════════════════════════════════
+#  Jyotish Vedic Dashboard — launcher
 #  Usage:  ./start.sh
-# ──────────────────────────────────────────────────────
+#          PORT=8080 ./start.sh      (custom port)
+# ══════════════════════════════════════════════════════════════════
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Activate virtual environment if it exists
-if [ -f ".venv/bin/activate" ]; then
+# Activate virtual environment
+if [[ -f ".venv/bin/activate" ]]; then
+    # shellcheck source=/dev/null
     source .venv/bin/activate
-elif [ -f "venv/bin/activate" ]; then
+elif [[ -f "venv/bin/activate" ]]; then
+    # shellcheck source=/dev/null
     source venv/bin/activate
+else
+    echo "  ✘  No virtual environment found. Run:  bash install.sh"
+    exit 1
 fi
 
-# Copy .env if not present
-if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+# Create .env from example if missing
+if [[ ! -f ".env" ]] && [[ -f ".env.example" ]]; then
     cp .env.example .env
-    echo "Created .env from .env.example — edit it to add API keys."
+    echo "  →  Created .env — run 'bash install.sh' to configure fully."
 fi
 
-# Set Swiss Ephemeris path
-export SE_EPHE_PATH="$SCRIPT_DIR/ephe"
+# Load .env
+if [[ -f ".env" ]]; then
+    # shellcheck disable=SC2046
+    export $(grep -v '^#' .env | grep -v '^$' | xargs) 2>/dev/null || true
+fi
 
-PORT=${PORT:-5000}
+export SE_EPHE_PATH="$SCRIPT_DIR/ephe"
+PORT="${PORT:-5001}"
+
 echo ""
-echo "  ╔═══════════════════════════════════════╗"
-echo "  ║   🔮  Jyotish Vedic Dashboard         ║"
-echo "  ║   http://localhost:$PORT               ║"
-echo "  ╚═══════════════════════════════════════╝"
+echo "  ╔════════════════════════════════════════════╗"
+echo "  ║  🔮  Jyotish Vedic Dashboard               ║"
+echo "  ║                                            ║"
+echo "  ║  Open:   http://localhost:$PORT            ║"
+echo "  ║  Stop:   Ctrl+C                            ║"
+echo "  ╚════════════════════════════════════════════╝"
 echo ""
 
 python run.py

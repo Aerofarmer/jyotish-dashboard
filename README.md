@@ -1,6 +1,6 @@
-# 🕉️ Jyotish Vedic Dashboard
+# 🔮 Jyotish Vedic Dashboard
 
-> **Free, open-source Vedic astrology software** — Kundli, Panchang, Transit, Dasha, Daily Predictions, and a full interactive calendar. Runs entirely on your machine; no subscription, no ads.
+> **Free, open-source Vedic astrology software** — Kundli, Panchang, Transit, Dasha, Daily Predictions, Prediction Calendar, and iCal/Obsidian sync. Runs entirely on your machine. No subscription, no ads, no cloud required.
 
 ---
 
@@ -10,136 +10,170 @@
 |---|---|
 | **Kundli (Birth Chart)** | North-Indian & Navamsa D9 canvas chart · planet positions · dignity · nakshatra |
 | **Panchang** | Tithi · Nakshatra · Yoga · Karana · Vara · Tarabala · Chandra Bala · Abhijit Muhurta |
-| **Transit Chart** | Live planetary positions · nakshatra → natal-house warning map · danger/warning/positive alerts |
-| **Vimshottari Dasha** | Full Mahadasha → Antardasha → Pratyantardasha tree with timeline bar |
-| **Daily Predictions** | Overall score · मन की बात (emotional state) · Love · Career · Major changes · Enemy/Friend of the day · Planet-by-planet forecast |
-| **Prediction Calendar** | Month view with per-day quality dots (Excellent→Difficult) · click any day for deep panchang detail · navigate to that day's predictions |
-| **Sky panel** | Sunrise · Sunset · Moonrise · Moonset · Solar noon · Day length · Rahu Kaal · Gulika Kaal · Yamaghanta · Moon phase |
-| **Save charts** | Store multiple Kundlis locally; load/delete from the home screen |
-| **Auto location** | IP-based city pre-fill · geocode by city name · browser GPS button |
+| **Transit Chart** | Live planetary positions · nakshatra → natal-house map · danger/warning/positive alerts |
+| **Vimshottari Dasha** | Full Mahadasha → Antardasha → Pratyantardasha tree with timeline |
+| **Daily Predictions** | Overall score · Emotional state · Love · Career · Major changes · Planet forecasts |
+| **Prediction Calendar** | Month view with per-day quality dots · click any day for full panchang detail panel |
+| **Sky panel** | Sunrise · Sunset · Moonrise · Moonset · Rahu Kaal · Gulika Kaal · Abhijit Muhurta |
+| **iCal Export** | Download `.ics` for Apple / Outlook / Google Calendar with panchang notes per day |
+| **Obsidian Export** | ZIP of daily `.md` notes with YAML frontmatter, panchang tables, sky grid |
+| **AI day notes** | Optional 2-sentence Vedic insight per exported day via Ollama / Groq / OpenRouter |
+| **Save charts** | Store multiple Kundlis locally; load/delete from home screen |
+| **Auto location** | IP-based city pre-fill · geocode by city name · browser GPS |
 
-All calculations use the **Lahiri ayanamsa** (sidereal zodiac, Whole Sign houses) via **Swiss Ephemeris** — the same engine used by professional Jyotish software.
-
----
-
-## 🖥️ Screenshots
-
-```
-Home / Birth form          Kundli chart              Transit warnings
-┌──────────────┐          ┌──────────────┐           ┌──────────────┐
-│ ॐ Jyotish   │          │ North-Indian │           │ 0 Danger     │
-│ Vedic Dash  │          │ 4×4 grid     │           │ 3 Warning    │
-│             │          │ canvas chart │           │ 2 Positive   │
-│ [Birth form]│          │              │           │ [Nak table]  │
-└──────────────┘          └──────────────┘           └──────────────┘
-
-Prediction Calendar                     Day detail panel
-┌──────────────────────────────┐        ┌────────────────────────┐
-│ < May 2026 >                 │        │ 11 May 2026  Monday    │
-│ Sun Mon Tue Wed Thu Fri Sat  │        │ ★ 9/10  Excellent      │
-│  ●   ●   ●   ●   ●   ●   ●  │  ───▶  │ Vara: Friday   Good    │
-│ Good Exc Cau Good Exc Mod G  │        │ Tithi: Navami  Neutral │
-│ [click any day]              │        │ Nakshatra: Swati Good  │
-└──────────────────────────────┘        │ Sunrise 05:29 · ...    │
-                                        │ [Predictions →]        │
-                                        └────────────────────────┘
-```
+All calculations use **Lahiri ayanamsa** (sidereal zodiac, Whole Sign houses) via **Swiss Ephemeris** — the same engine used by professional Jyotish software. All astro runs **100% offline**.
 
 ---
 
-## 🚀 Quick Start — 3 Ways
+## 🚀 Quick Start
 
-### Option 1 · Local Python (recommended for development)
+### Option 1 — Interactive installer (recommended)
 
 ```bash
 # 1. Clone
 git clone https://github.com/Aerofarmer/jyotish-dashboard.git
 cd jyotish-dashboard
 
-# 2. Set up environment
+# 2. Run the installer — it guides you through everything
+bash install.sh
+```
+
+The installer will:
+- Check for updates from GitHub
+- Set up a Python virtual environment
+- Install all dependencies
+- Download Swiss Ephemeris data files (~30 MB)
+- Ask about optional AI notes (Ollama / Groq / OpenRouter)
+- Offer to create a desktop shortcut or app-menu entry
+- Ask if you want to launch the app immediately
+
+**Update later:**
+```bash
+bash install.sh --update
+```
+
+---
+
+### Option 2 — Manual (step by step)
+
+```bash
+git clone https://github.com/Aerofarmer/jyotish-dashboard.git
+cd jyotish-dashboard
+
+# Python virtual environment
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# 3. Configure (optional — app works without API keys)
-cp .env.example .env
-# edit .env if you want OpenCage geocoding (free tier)
-
-# 4. Download Swiss Ephemeris data
-mkdir -p ephe
-cd ephe
-wget https://www.astro.com/ftp/swisseph/ephe/seas_18.se1
-wget https://www.astro.com/ftp/swisseph/ephe/semo_18.se1
-wget https://www.astro.com/ftp/swisseph/ephe/sepl_18.se1
+# Download Swiss Ephemeris data
+mkdir -p ephe && cd ephe
+curl -O https://www.astro.com/ftp/swisseph/ephe/seas_18.se1
+curl -O https://www.astro.com/ftp/swisseph/ephe/semo_18.se1
+curl -O https://www.astro.com/ftp/swisseph/ephe/sepl_18.se1
 cd ..
 
-# 5. Run
-SE_EPHE_PATH=./ephe python run.py
-# Opens http://localhost:5001 automatically
-```
+# Configure (optional)
+cp .env.example .env   # edit .env if you want AI notes or geocoding API keys
 
-### Option 2 · Docker (recommended for servers / one-command deploy)
-
-```bash
-# 1. Clone
-git clone https://github.com/Aerofarmer/jyotish-dashboard.git
-cd jyotish-dashboard
-
-# 2. Copy env file
-cp .env.example .env
-# (edit .env to add your FLASK_SECRET_KEY at minimum)
-
-# 3. Build and run
-docker compose up -d
-
-# App is now at http://localhost:5000
-# Logs:
-docker compose logs -f
-```
-
-> Docker automatically downloads the Swiss Ephemeris files on first build.  
-> Data is persisted in a named volume so rebuilds are fast.
-
-### Option 3 · Linux Desktop (Ubuntu / Debian — installs as a launcher icon)
-
-```bash
-git clone https://github.com/Aerofarmer/jyotish-dashboard.git
-cd jyotish-dashboard
-chmod +x install.sh && ./install.sh
-# Adds "Jyotish Dashboard" to your app menu
-# Double-click to launch — opens in your browser automatically
+# Run
+./start.sh
+# Opens http://localhost:5001
 ```
 
 ---
 
-## 🔄 Sync / Update (all methods)
+### Option 3 — Docker (one command, no Python setup needed)
 
 ```bash
-# Pull latest changes
-git pull origin main
-
-# Local Python — restart the app
-SE_EPHE_PATH=./ephe python run.py
-
-# Docker — rebuild and restart
-docker compose up -d --build
-
-# Linux desktop — re-run install script (safe to re-run)
-./install.sh
+git clone https://github.com/Aerofarmer/jyotish-dashboard.git
+cd jyotish-dashboard
+cp .env.example .env          # edit FLASK_SECRET_KEY at minimum
+docker compose up -d
+# App at http://localhost:5000
+docker compose logs -f        # view logs
 ```
+
+> Docker downloads the Swiss Ephemeris files automatically on first build.
+
+---
+
+## 🔄 Sync / Update
+
+```bash
+# Pull latest, reinstall packages, keep your .env
+bash install.sh --update
+
+# Or manually
+git pull origin main
+source .venv/bin/activate
+pip install -r requirements.txt   # picks up any new packages
+./start.sh
+```
+
+---
+
+## 🤖 AI Day Notes (optional)
+
+The iCal and Obsidian exports can include a 2-sentence Vedic AI insight per day, generated by an open LLM tuned with a Jyotishi system prompt. Three zero-cost options:
+
+### Ollama — fully local, private, free
+
+```bash
+# 1. Install Ollama
+#    macOS:  brew install ollama   OR   https://ollama.com
+#    Linux:  curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. Pull a model
+ollama pull llama3.2
+
+# 3. Add to .env
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_API_KEY=ollama
+LLM_MODEL=llama3.2
+```
+
+### Groq — free cloud API, very fast
+
+```bash
+# Get a free key at https://console.groq.com
+LLM_BASE_URL=https://api.groq.com/openai/v1
+LLM_API_KEY=your_groq_key
+LLM_MODEL=llama-3.1-8b-instant
+```
+
+### OpenRouter — free cloud models
+
+```bash
+# Get a free key at https://openrouter.ai
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_API_KEY=your_openrouter_key
+LLM_MODEL=meta-llama/llama-3.2-3b-instruct:free
+```
+
+> Leave `LLM_MODEL` empty (or unset) to disable AI notes. The app is fully functional without them.
 
 ---
 
 ## 🌐 API Keys — What's required?
 
-| Key | Required? | What it enables | Get it free |
-|---|---|---|---|
-| `FLASK_SECRET_KEY` | **Yes** | Session security (any random string) | Generate: `python3 -c "import secrets; print(secrets.token_hex(32))"` |
-| `OPENCAGE_API_KEY` | No | Better geocoding accuracy | [opencagedata.com](https://opencagedata.com) — 2500 req/day free |
-| `TIMEZONEDB_API_KEY` | No | Timezone fallback | [timezonedb.com](https://timezonedb.com) — free |
-| `PROKERALA_*` | No | Supplemental panchang | [api.prokerala.com](https://api.prokerala.com) |
+| Key | Required? | What it enables |
+|---|---|---|
+| `FLASK_SECRET_KEY` | **Yes** | Session security — auto-generated by `install.sh` |
+| `LLM_MODEL` + friends | No | AI Vedic notes in iCal/Obsidian exports |
+| `OPENCAGE_API_KEY` | No | Better geocoding (2500 req/day free at opencagedata.com) |
+| `TIMEZONEDB_API_KEY` | No | Timezone fallback (free at timezonedb.com) |
 
-**Without any API keys:** geocoding uses Nominatim (OpenStreetMap, no key needed), timezone is computed offline via `timezonefinder`. The app is fully functional.
+Without any keys: geocoding uses Nominatim (OpenStreetMap), timezone is computed offline via `timezonefinder`. Fully functional.
+
+---
+
+## 📅 Calendar & Obsidian Sync
+
+On the **Predictions** page, scroll to the **Sync & Export** panel:
+
+- **iCal (.ics)** — pick month/year → download → import into Apple Calendar, Outlook, or Google Calendar (File → Import)
+- **Google Calendar** — use the "Open GCal Import" button to import the `.ics`, or click any calendar day and hit "Add to GCal" for a single event
+- **Obsidian ZIP** — pick month/year → download ZIP → extract into your Obsidian vault. Each day becomes a `YYYY-MM-DD.md` note with YAML frontmatter (score, tithi, nakshatra, vara, sunrise, Rahu Kaal) plus panchang tables and sky times
 
 ---
 
@@ -160,45 +194,35 @@ jyotish-dashboard/
 │   ├── static/
 │   │   ├── css/style.css   # Light Vedic theme
 │   │   └── js/chart.js     # Canvas North-Indian chart renderer
-│   └── routes.py           # Flask routes + API endpoints
-├── ephe/                   # Swiss Ephemeris data files (downloaded separately)
+│   └── routes.py           # Flask routes + export endpoints
+├── ephe/                   # Swiss Ephemeris files (downloaded by installer)
 ├── data/                   # Saved charts (local JSON, git-ignored)
+├── install.sh              # Interactive cross-platform installer
+├── start.sh                # App launcher
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
 └── run.py
 ```
 
-**Tech stack:** Python 3.11 · Flask · pyswisseph · ephem · Bootstrap 5 · Canvas 2D · Nominatim · Docker
+**Tech stack:** Python 3.10+ · Flask · pyswisseph · ephem · Bootstrap 5 · Canvas 2D · openai SDK (LLM client) · Nominatim · Docker
 
 ---
 
-## 🖥️ API Endpoints (self-hosted)
+## 📋 Prerequisites
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/sky` | Sunrise, sunset, moon times, Rahu Kaal for a location |
-| `GET /api/month-scores` | Per-day panchang quality scores for the calendar |
-| `GET /api/day-detail` | Full panchang + sky + breakdown for a single date |
-| `GET /api/geocode` | City name → lat/lon + timezone |
-| `GET /api/panchang` | Full panchang JSON for any date |
-
----
-
-## 📋 Requirements
-
-- **Python 3.10+** (3.11 recommended)
-- **C compiler** (for pyswisseph): `sudo apt install gcc` on Debian/Ubuntu
-- **Swiss Ephemeris files** — downloaded during install (3 files, ~30 MB total)
-- **Internet** — only for geocoding and IP location; all astro calculations are offline
+- **Python 3.10+** (3.11 or 3.12 recommended)
+- **C compiler** for pyswisseph: `sudo apt install gcc` on Debian/Ubuntu, Xcode CLT on macOS (`xcode-select --install`)
+- **Internet** — only for geocoding and ephemeris download; all astro calculations run offline after that
 
 ---
 
 ## 🔐 Privacy
 
-All calculations happen **locally on your machine**. Birth data is stored only in your browser session (cleared when you close the tab) or in `data/charts.json` on your own disk. Nothing is sent to any external server except:
-- Nominatim (OpenStreetMap) for city → coordinates lookup
-- ip-api.com for auto-detecting your city on the home page (no account needed)
+All calculations happen **locally on your machine**. Birth data is stored only in your browser session or in `data/charts.json` on your own disk. Nothing is sent externally except:
+- Nominatim (OpenStreetMap) for city → coordinates
+- ip-api.com for auto-detecting your city on the home page (no account)
+- Your chosen LLM endpoint (only if `LLM_MODEL` is set; Ollama stays local)
 
 ---
 
@@ -215,3 +239,4 @@ MIT — free to use, modify, and self-host. Attribution appreciated.
 - **ephem** — sunrise/moonrise calculations
 - **Nominatim / OpenStreetMap** — geocoding
 - **Bootstrap 5** + **Bootstrap Icons** — UI framework
+- **Ollama / Groq / OpenRouter** — open LLM inference
