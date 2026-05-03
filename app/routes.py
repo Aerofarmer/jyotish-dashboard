@@ -120,7 +120,13 @@ def load_kundli(cid):
         session["birth_dob"] = bd[:10]
         session["birth_tob"] = bd[11:16]
 
-    # Recompute dasha from saved moon longitude
+    # ?next= lets callers redirect straight to predictions/transit/dasha
+    next_page = request.args.get("next", "")
+    allowed   = {"predictions", "transit", "dasha", "panchang", "kundli"}
+    if next_page in allowed:
+        return redirect(url_for(f"main.{next_page}"))
+
+    # Default: render full kundli chart
     dasha = None
     try:
         moon_lon = chart["planets"]["Moon"]["longitude"]

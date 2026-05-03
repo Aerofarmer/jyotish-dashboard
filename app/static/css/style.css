@@ -1245,3 +1245,123 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
+
+/* ── Kundli mode tabs ─────────────────────────────────── */
+.kundli-mode-tabs {
+  display: flex;
+  gap: 10px;
+}
+
+.kmt-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.kmt-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.kmt-btn.active {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+
+.kmt-count {
+  background: rgba(255,255,255,0.25);
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: 0.75rem;
+}
+
+.kmt-btn:not(.active) .kmt-count {
+  background: rgba(201,148,10,0.12);
+  color: var(--gold);
+}
+
+/* ── Saved kundli cards ───────────────────────────────── */
+.kundli-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.kundli-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.kundli-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 4px 16px rgba(201,148,10,0.12);
+}
+
+.kc-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+  color: #fff;
+  font-family: 'Cinzel', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kc-body { flex: 1; min-width: 0; }
+
+.kc-name {
+  font-family: 'Cinzel', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.kc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.kc-meta i { margin-right: 3px; }
+
+.kc-place {
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
